@@ -83,7 +83,10 @@ function useLocalState(key, initial) {
 export default function App() {
   const fileInputRef = useRef(null);
 
-  // Spotify
+// Spotify
+const REDIRECT_URI =
+  `${window.location.origin}${window.location.pathname.replace(/\/$/, "")}`;
+
 const {
   user: spUser,
   busy: spBusy,
@@ -92,8 +95,9 @@ const {
   exportToSpotify,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri: "window.location.origin",
+  redirectUri: `${window.location.origin}${process.env.PUBLIC_URL || ''}/`,
 });
+
 
 
   // Core state
