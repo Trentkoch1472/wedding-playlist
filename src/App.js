@@ -95,10 +95,8 @@ const {
   exportToSpotify,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri: `${window.location.origin}${process.env.PUBLIC_URL || ''}/`,
+  redirectUri: new URL("./", window.location.href).href, // e.g. https://trentkoch1472.github.io/wedding-playlist/
 });
-
-
 
   // Core state
   const [songs, setSongs] = useLocalState("wps_songs", []);
