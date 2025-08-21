@@ -92,7 +92,7 @@ const {
   exportToSpotify,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri: "http://127.0.0.1:3000",
+  redirectUri: "window.location.origin",
 });
 
 
