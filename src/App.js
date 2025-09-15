@@ -311,13 +311,11 @@ useEffect(() => {
     setPreviewing(false);
   }, [previewAudio]);
 
-  // Fetch and cache preview URL + cover art, and IMMUTABLY update songs[]
 // Fetch & cache preview URL + cover art (retry if previous result was null)
 const ensureMeta = useCallback(
   async (song, { force = false } = {}) => {
     if (!song) return null;
 
-    // Only short-circuit when we already have BOTH, and they’re non-null.
     const haveGoodPreview = typeof song.__preview === "string" && !!song.__preview;
     const haveArt = typeof song.__art === "string" && !!song.__art;
     if (!force && haveGoodPreview && haveArt) {
@@ -330,58 +328,40 @@ const ensureMeta = useCallback(
       (song.artist || "").trim(),
     ].filter(Boolean);
 
-    let bestPreview = haveGoodPreview ? song.__preview : null;
-    let bestArt = haveArt ? song.__art : null;
+    let bestPreview = haveGoodPreview ? toHttps(song.__preview) : null;
+    let bestArt = haveArt ? toHttps(song.__art) : null;
 
     for (const q of attempts) {
       try {
-        // country=US + entity=song + limit=5, then score best match
         const r = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicTrack&country=US&limit=5`
         );
         const j = await r.json();
-        const results = Array.isArray(j.results) ? j.results : [];
+        const items = Array.isArray(j.results) ? j.results : [];
+        const best = pickBestItunes(items, song.title, song.artist);
 
-        const tn = normalize(song.title);
-        const an = normalize(song.artist || "");
-
-        let bestItem = null;
-        let bestScore = -1;
-        for (const it of results) {
-          const t2 = normalize(it.trackName || "");
-          const a2 = normalize(it.artistName || "");
-          let score = 0;
-          if (t2 === tn) score += 3;
-          if (a2 && an && a2 === an) score += 3;
-          if (t2.includes(tn) || tn.includes(t2)) score += 1;
-          if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
-          if (score > bestScore) {
-            bestScore = score;
-            bestItem = it;
+        if (best) {
+          if (!bestPreview && best.previewUrl) {
+            bestPreview = toHttps(best.previewUrl);
           }
-        }
-
-        const item = bestItem || results[0];
-        if (item) {
-          if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
           if (!bestArt) {
             const raw =
-              item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
+              best.artworkUrl100 || best.artworkUrl60 || best.artworkUrl512 || null;
             if (raw) {
-              // generic upsize: /100x100bb/ -> /600x600bb/
-              const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
-              bestArt = big || raw;
+              // upsize 100x100bb.jpg -> 600x600bb.jpg
+              const big = raw.replace(/\/\d+x\d+bb(\.[a-z]+)?$/i, "/600x600bb$1");
+              bestArt = toHttps(big || raw);
             }
           }
         }
 
-        if (bestPreview && bestArt) break; // got both, stop early
+        if (bestPreview && bestArt) break; // got both
       } catch {
         // try next attempt
       }
     }
 
-    // Immutably persist whatever we found (even if one of them is still null)
+    // persist (even if one is still null)
     setSongs((prev) => {
       const idx = prev.findIndex((s) => s.__id === song.__id);
       if (idx === -1) return prev;
@@ -462,7 +442,7 @@ const ensureMeta = useCallback(
 
     // Try playing immediately. Some mobile browsers still require a second tap,
     // in which case our tryPlay() will show a helpful message.
-    const a = makeAudio(meta.preview);
+    const a = makeAudio(toHttps(meta.preview));
     setPreviewAudio(a);
     setPreviewing(true);
     await tryPlay(a);
@@ -470,7 +450,7 @@ const ensureMeta = useCallback(
   }
 
   // We have a cached preview: play immediately.
-  const a = makeAudio(song.__preview);
+  const a = makeAudio(toHttps(song.__preview));
   setPreviewAudio(a);
   setPreviewing(true);
   await tryPlay(a);
@@ -919,7 +899,7 @@ const exportBuckets = () => {
 
                         {nextSong.__art ? (
                           <img
-                            src={nextSong.__art}
+                            src={toHttps(nextSong.__art)}
                             alt={`${nextSong.title} cover`}
                             className="mx-auto mt-4 w-28 h-28 rounded-xl shadow-md object-cover"
                             loading="lazy"
@@ -988,7 +968,7 @@ const exportBuckets = () => {
 
                       {current.__art ? (
                         <img
-                          src={current.__art}
+                          src={toHttps(current.__art)}
                           alt={`${current.title} cover`}
                           className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
                         />
