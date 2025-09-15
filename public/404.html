@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Redirecting…</title>
+    <script>
+      // SPA deep-link fallback: send everything back to index.html
+      sessionStorage.redirect = location.pathname + location.search + location.hash;
+      location.replace("/");
+    </script>
+  </head>
+  <body></body>
+</html>
