@@ -30,6 +30,40 @@ function normalize(str = "") {
     .trim();
 }
 
+// Force HTTPS on Apple assets to avoid mixed-content on mobile
+function toHttps(u) {
+  return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
+}
+
+// Choose the best iTunes hit that actually has a preview/art
+function pickBestItunes(items, wantTitle, wantArtist) {
+  const nt = (wantTitle || "").toLowerCase();
+  const na = (wantArtist || "").toLowerCase();
+
+  // Prefer: has preview, then artwork, then title/artist similarity
+  let best = null;
+  let bestScore = -1;
+
+  for (const it of items || []) {
+    const t = (it.trackName || "").toLowerCase();
+    const a = (it.artistName || "").toLowerCase();
+
+    let score = 0;
+    if (it.previewUrl) score += 3;
+    if (it.artworkUrl100 || it.artworkUrl60 || it.artworkUrl512) score += 2;
+
+    // Light-weight matching bonus
+    if (t && nt && (t.includes(nt) || nt.includes(t))) score += 2;
+    if (a && na && (a.includes(na) || na.includes(a))) score += 2;
+
+    if (score > bestScore) {
+      best = it;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function download(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const link = document.createElement("a");
@@ -287,12 +321,12 @@ const ensureMeta = useCallback(
   async (song) => {
     if (!song) return null;
 
-    // If already looked up, return what we have
+    // Already cached?
     if (song.__preview !== undefined && song.__art !== undefined) {
       return { preview: song.__preview, art: song.__art };
     }
 
-    // Try a few query shapes
+    // Try a few query shapes; mobile results can differ from desktop
     const attempts = [
       `${song.artist || ""} ${song.title}`.trim(),
       song.title?.trim(),
@@ -300,57 +334,54 @@ const ensureMeta = useCallback(
     ].filter(Boolean);
 
     let preview = song.__preview ?? null;
-    let art = song.__art ?? null;
+    let art     = song.__art ?? null;
 
     for (const q of attempts) {
       try {
-        const r = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=1`,
-          { mode: "cors", cache: "force-cache" }
-        );
+        // Ask for several candidates so we can pick one that actually has a preview
+        const url =
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}` +
+          `&media=music&entity=song&country=US&limit=5`;
+
+        const r = await fetch(url, { mode: "cors", cache: "force-cache" });
         if (!r.ok) continue;
         const j = await r.json();
-        const item = j.results?.[0];
-        if (item) {
-          // Force HTTPS to avoid mobile mixed-content blocks
-          if (!preview && item.previewUrl) preview = toHttps(item.previewUrl);
+
+        const best = pickBestItunes(j.results, song.title, song.artist);
+        if (best) {
+          if (!preview && best.previewUrl) preview = toHttps(best.previewUrl);
 
           if (!art) {
             const raw =
-              toHttps(item.artworkUrl100) ||
-              toHttps(item.artworkUrl60) ||
-              toHttps(item.artworkUrl512) ||
-              null;
+              toHttps(best.artworkUrl100) ||
+              toHttps(best.artworkUrl60)  ||
+              toHttps(best.artworkUrl512) || null;
             if (raw) {
-              // upscale common sizes to a nicer square
-              let big = raw
+              // upscale typical sizes
+              art = raw
                 .replace(/100x100bb/i, "600x600bb")
-                .replace(/60x60bb/i, "600x600bb")
-                .replace(/512x512bb/i, "600x600bb");
-              art = big || raw;
+                .replace(/60x60bb/i,  "600x600bb")
+                .replace(/512x512bb/i,"600x600bb");
             }
           }
         }
+
+        // If we found either, we're good enough
         if (preview || art) break;
       } catch (err) {
-        // Continue to next attempt
         console.warn("Meta fetch failed for", q, err);
       }
     }
 
-    // immutably patch this song in the array so React re-renders
+    // Cache immutably so React re-renders
     setSongs((prev) => {
       const idx = prev.findIndex((s) => s.__id === song.__id);
       if (idx === -1) return prev;
       const cur = prev[idx];
-      const nextVals = {
-        ...cur,
-        __preview: preview ?? null,
-        __art: art ?? null,
-      };
-      if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
+      const next = { ...cur, __preview: preview ?? null, __art: art ?? null };
+      if (cur.__preview === next.__preview && cur.__art === next.__art) return prev;
       const copy = prev.slice();
-      copy[idx] = nextVals;
+      copy[idx] = next;
       return copy;
     });
 
