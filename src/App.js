@@ -76,6 +76,10 @@ function shuffle(arr) {
   return a;
 }
 
+// Normalize iTunes URLs to HTTPS to avoid mixed-content blocking on mobile
+function toHttps(u) {
+  return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
+}
 
 /* ========== App ========== */
 export default function App() {
@@ -279,75 +283,81 @@ useEffect(() => {
   }, [previewAudio]);
 
   // Fetch and cache preview URL + cover art, and IMMUTABLY update songs[]
-  const ensureMeta = useCallback(
-    async (song) => {
-      if (!song) return null;
+const ensureMeta = useCallback(
+  async (song) => {
+    if (!song) return null;
 
-      // If we already looked it up, return what we have
-      if (song.__preview !== undefined && song.__art !== undefined) {
-        return { preview: song.__preview, art: song.__art };
-      }
+    // If already looked up, return what we have
+    if (song.__preview !== undefined && song.__art !== undefined) {
+      return { preview: song.__preview, art: song.__art };
+    }
 
-      const attempts = [
-        `${song.artist || ""} ${song.title}`.trim(),
-        song.title?.trim(),
-        (song.artist || "").trim(),
-      ].filter(Boolean);
+    // Try a few query shapes
+    const attempts = [
+      `${song.artist || ""} ${song.title}`.trim(),
+      song.title?.trim(),
+      (song.artist || "").trim(),
+    ].filter(Boolean);
 
-      let preview = song.__preview ?? null;
-      let art = song.__art ?? null;
+    let preview = song.__preview ?? null;
+    let art = song.__art ?? null;
 
-      for (const q of attempts) {
-        try {
-          const r = await fetch(
-            `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=1`
-          );
-          const j = await r.json();
-          const item = j.results?.[0];
-          if (item) {
-            if (!preview && item.previewUrl) preview = item.previewUrl;
+    for (const q of attempts) {
+      try {
+        const r = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=1`,
+          { mode: "cors", cache: "force-cache" }
+        );
+        if (!r.ok) continue;
+        const j = await r.json();
+        const item = j.results?.[0];
+        if (item) {
+          // Force HTTPS to avoid mobile mixed-content blocks
+          if (!preview && item.previewUrl) preview = toHttps(item.previewUrl);
 
-            if (!art) {
-              const raw =
-                item.artworkUrl100 ||
-                item.artworkUrl60 ||
-                item.artworkUrl512 ||
-                null;
-              if (raw) {
-                let big = raw;
-                big = big.replace(/100x100bb/, "600x600bb");
-                big = big.replace(/60x60bb/, "600x600bb");
-                big = big.replace(/512x512bb/, "600x600bb");
-                art = big || raw;
-              }
+          if (!art) {
+            const raw =
+              toHttps(item.artworkUrl100) ||
+              toHttps(item.artworkUrl60) ||
+              toHttps(item.artworkUrl512) ||
+              null;
+            if (raw) {
+              // upscale common sizes to a nicer square
+              let big = raw
+                .replace(/100x100bb/i, "600x600bb")
+                .replace(/60x60bb/i, "600x600bb")
+                .replace(/512x512bb/i, "600x600bb");
+              art = big || raw;
             }
           }
-          if (preview && art) break;
-        } catch {
-          // try next
         }
+        if (preview || art) break;
+      } catch (err) {
+        // Continue to next attempt
+        console.warn("Meta fetch failed for", q, err);
       }
+    }
 
-      // immutably patch this song in the array so React re-renders
-      setSongs((prev) => {
-        const idx = prev.findIndex((s) => s.__id === song.__id);
-        if (idx === -1) return prev;
-        const cur = prev[idx];
-        const nextVals = {
-          ...cur,
-          __preview: preview ?? null,
-          __art: art ?? null,
-        };
-        if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
-        const copy = prev.slice();
-        copy[idx] = nextVals;
-        return copy;
-      });
+    // immutably patch this song in the array so React re-renders
+    setSongs((prev) => {
+      const idx = prev.findIndex((s) => s.__id === song.__id);
+      if (idx === -1) return prev;
+      const cur = prev[idx];
+      const nextVals = {
+        ...cur,
+        __preview: preview ?? null,
+        __art: art ?? null,
+      };
+      if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
+      const copy = prev.slice();
+      copy[idx] = nextVals;
+      return copy;
+    });
 
-      return { preview, art };
-    },
-    [setSongs]
-  );
+    return { preview, art };
+  },
+  [setSongs]
+);
 
   // Audio element factory
   const makeAudio = (url) => {
@@ -387,27 +397,41 @@ useEffect(() => {
   };
 
   const togglePreview = useCallback(async () => {
-    if (previewing) {
-      stopPreview();
+  if (previewing) {
+    stopPreview();
+    return;
+  }
+
+  const song = current;
+  if (!song) return;
+
+  // If we don't have a preview yet, try to fetch it now.
+  if (!song.__preview) {
+    setPreviewPreparing(true);
+    const meta = await ensureMeta(song).catch(() => null);
+    setPreviewPreparing(false);
+
+    // If still no preview after fetching, let the user know and bail.
+    if (!meta?.preview) {
+      alert("No 30s preview available for this track.");
       return;
     }
-    const song = current;
-    if (!song) return;
 
-    // First tap: resolve and cache preview URL, then ask user to tap again to play
-    if (!song.__preview) {
-      setPreviewPreparing(true);
-      ensureMeta(song).finally(() => setPreviewPreparing(false));
-      alert("Preparing the snippet… tap the button again to play.");
-      return;
-    }
-
-    // Cached: play immediately
-    const a = makeAudio(song.__preview);
+    // Try playing immediately. Some mobile browsers still require a second tap,
+    // in which case our tryPlay() will show a helpful message.
+    const a = makeAudio(meta.preview);
     setPreviewAudio(a);
     setPreviewing(true);
     await tryPlay(a);
-  }, [previewing, stopPreview, current, ensureMeta]);
+    return;
+  }
+
+  // We have a cached preview: play immediately.
+  const a = makeAudio(song.__preview);
+  setPreviewAudio(a);
+  setPreviewing(true);
+  await tryPlay(a);
+}, [previewing, stopPreview, current, ensureMeta]);
 
   // stop preview when changing card
   useEffect(() => {
@@ -430,10 +454,11 @@ useEffect(() => {
   }, [previewAudio]);
 
   // prefetch current + next preview URL to reduce blocking
-  useEffect(() => {
-    ensureMeta(current);
-    ensureMeta(nextSong);
-  }, [current, nextSong, ensureMeta]);
+useEffect(() => {
+  ensureMeta(current);
+  ensureMeta(nextSong);
+  if (songs[index + 2]) ensureMeta(songs[index + 2]);
+}, [current, nextSong, ensureMeta, songs, index]);
 
   /* ---- swipe logic ---- */
   const flingAndCommit = useCallback(
