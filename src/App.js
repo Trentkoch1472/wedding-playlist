@@ -186,6 +186,7 @@ const {
   msg: spMsg,
   login: spotifyLogin,
   exportToSpotify
+  findTrackMeta,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
   redirectUri: SPOTIFY_REDIRECT_URI,
@@ -312,6 +313,7 @@ useEffect(() => {
   }, [previewAudio]);
 
 // Fetch & cache preview URL + cover art (retry if previous result was null)
+// REPLACE your existing ensureMeta with this whole block:
 const ensureMeta = useCallback(
   async (song, { force = false } = {}) => {
     if (!song) return null;
@@ -328,40 +330,71 @@ const ensureMeta = useCallback(
       (song.artist || "").trim(),
     ].filter(Boolean);
 
-    let bestPreview = haveGoodPreview ? toHttps(song.__preview) : null;
-    let bestArt = haveArt ? toHttps(song.__art) : null;
+    let bestPreview = haveGoodPreview ? song.__preview : null;
+    let bestArt = haveArt ? song.__art : null;
 
+    // 1) Try iTunes first (often has 30s previews)
     for (const q of attempts) {
       try {
         const r = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicTrack&country=US&limit=5`
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
         );
         const j = await r.json();
-        const items = Array.isArray(j.results) ? j.results : [];
-        const best = pickBestItunes(items, song.title, song.artist);
+        const results = Array.isArray(j.results) ? j.results : [];
 
-        if (best) {
-          if (!bestPreview && best.previewUrl) {
-            bestPreview = toHttps(best.previewUrl);
+        const tn = normalize(song.title);
+        const an = normalize(song.artist || "");
+
+        let bestItem = null;
+        let bestScore = -1;
+        for (const it of results) {
+          const t2 = normalize(it.trackName || "");
+          const a2 = normalize(it.artistName || "");
+          let score = 0;
+          if (t2 === tn) score += 3;
+          if (a2 && an && a2 === an) score += 3;
+          if (t2.includes(tn) || tn.includes(t2)) score += 1;
+          if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
+          if (score > bestScore) {
+            bestScore = score;
+            bestItem = it;
           }
+        }
+
+        const item = bestItem || results[0];
+        if (item) {
+          if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
           if (!bestArt) {
-            const raw =
-              best.artworkUrl100 || best.artworkUrl60 || best.artworkUrl512 || null;
+            const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
             if (raw) {
-              // upsize 100x100bb.jpg -> 600x600bb.jpg
-              const big = raw.replace(/\/\d+x\d+bb(\.[a-z]+)?$/i, "/600x600bb$1");
-              bestArt = toHttps(big || raw);
+              const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
+              bestArt = big || raw;
             }
           }
         }
 
-        if (bestPreview && bestArt) break; // got both
+        if (bestPreview && bestArt) break; // got both, stop early
       } catch {
         // try next attempt
       }
     }
 
-    // persist (even if one is still null)
+    // 2) If we STILL don't have preview and/or art, try Spotify (requires user to be logged in)
+    if ((!bestPreview || !bestArt) && typeof findTrackMeta === "function") {
+      try {
+        const sp = await findTrackMeta(song.title, song.artist);
+        if (sp) {
+          if (!bestPreview && sp.preview) bestPreview = sp.preview;
+          if (!bestArt && sp.art) bestArt = sp.art;
+        }
+      } catch {}
+    }
+
+    // 3) Force HTTPS to avoid mobile mixed-content blocks
+    if (bestPreview) bestPreview = toHttps(bestPreview);
+    if (bestArt) bestArt = toHttps(bestArt);
+
+    // 4) Save into our songs array
     setSongs((prev) => {
       const idx = prev.findIndex((s) => s.__id === song.__id);
       if (idx === -1) return prev;
@@ -379,7 +412,7 @@ const ensureMeta = useCallback(
 
     return { preview: bestPreview ?? null, art: bestArt ?? null };
   },
-  [setSongs]
+  [setSongs, findTrackMeta] // <-- include findTrackMeta here
 );
 
   // Audio element factory
