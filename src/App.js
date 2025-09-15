@@ -185,7 +185,7 @@ const {
   busy: spBusy,
   msg: spMsg,
   login: spotifyLogin,
-  exportToSpotify
+  exportToSpotify,
   findTrackMeta,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
@@ -314,106 +314,91 @@ useEffect(() => {
 
 // Fetch & cache preview URL + cover art (retry if previous result was null)
 // REPLACE your existing ensureMeta with this whole block:
-const ensureMeta = useCallback(
-  async (song, { force = false } = {}) => {
-    if (!song) return null;
+const ensureMeta = useCallback(async (song, { force = false } = {}) => {
+  if (!song) return null;
 
-    const haveGoodPreview = typeof song.__preview === "string" && !!song.__preview;
-    const haveArt = typeof song.__art === "string" && !!song.__art;
-    if (!force && haveGoodPreview && haveArt) {
-      return { preview: song.__preview, art: song.__art };
-    }
+  const havePreview = typeof song.__preview === "string" && song.__preview;
+  const haveArt = typeof song.__art === "string" && song.__art;
+  if (!force && havePreview && haveArt) {
+    return { preview: song.__preview, art: song.__art };
+  }
 
-    const attempts = [
-      `${song.artist || ""} ${song.title}`.trim(),
-      song.title?.trim(),
-      (song.artist || "").trim(),
-    ].filter(Boolean);
+  const attempts = [
+    `${song.artist || ""} ${song.title}`.trim(),
+    song.title?.trim(),
+    (song.artist || "").trim(),
+  ].filter(Boolean);
 
-    let bestPreview = haveGoodPreview ? song.__preview : null;
-    let bestArt = haveArt ? song.__art : null;
+  let bestPreview = havePreview ? song.__preview : null;
+  let bestArt = haveArt ? song.__art : null;
 
-    // 1) Try iTunes first (often has 30s previews)
-    for (const q of attempts) {
-      try {
-        const r = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
-        );
-        const j = await r.json();
-        const results = Array.isArray(j.results) ? j.results : [];
+  // Try iTunes first
+  for (const q of attempts) {
+    try {
+      const r = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
+      );
+      const j = await r.json();
+      const results = Array.isArray(j.results) ? j.results : [];
 
-        const tn = normalize(song.title);
-        const an = normalize(song.artist || "");
+      const tn = normalize(song.title);
+      const an = normalize(song.artist || "");
 
-        let bestItem = null;
-        let bestScore = -1;
-        for (const it of results) {
-          const t2 = normalize(it.trackName || "");
-          const a2 = normalize(it.artistName || "");
-          let score = 0;
-          if (t2 === tn) score += 3;
-          if (a2 && an && a2 === an) score += 3;
-          if (t2.includes(tn) || tn.includes(t2)) score += 1;
-          if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
-          if (score > bestScore) {
-            bestScore = score;
-            bestItem = it;
-          }
-        }
-
-        const item = bestItem || results[0];
-        if (item) {
-          if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
-          if (!bestArt) {
-            const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
-            if (raw) {
-              const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
-              bestArt = big || raw;
-            }
-          }
-        }
-
-        if (bestPreview && bestArt) break; // got both, stop early
-      } catch {
-        // try next attempt
+      let bestItem = null;
+      let bestScore = -1;
+      for (const it of results) {
+        const t2 = normalize(it.trackName || "");
+        const a2 = normalize(it.artistName || "");
+        let score = 0;
+        if (t2 === tn) score += 3;
+        if (a2 && an && a2 === an) score += 3;
+        if (t2.includes(tn) || tn.includes(t2)) score += 1;
+        if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
+        if (score > bestScore) { bestScore = score; bestItem = it; }
       }
-    }
 
-    // 2) If we STILL don't have preview and/or art, try Spotify (requires user to be logged in)
-    if ((!bestPreview || !bestArt) && typeof findTrackMeta === "function") {
-      try {
-        const sp = await findTrackMeta(song.title, song.artist);
-        if (sp) {
-          if (!bestPreview && sp.preview) bestPreview = sp.preview;
-          if (!bestArt && sp.art) bestArt = sp.art;
+      const item = bestItem || results[0];
+      if (item) {
+        if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
+        if (!bestArt) {
+          const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
+          if (raw) {
+            const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
+            bestArt = big || raw;
+          }
         }
-      } catch {}
-    }
+      }
+      if (bestPreview && bestArt) break;
+    } catch {}
+  }
 
-    // 3) Force HTTPS to avoid mobile mixed-content blocks
-    if (bestPreview) bestPreview = toHttps(bestPreview);
-    if (bestArt) bestArt = toHttps(bestArt);
+  // Spotify fallback (needs token)
+  if ((!bestPreview || !bestArt) && findTrackMeta) {
+    try {
+      const sp = await findTrackMeta(song.title, song.artist);
+      if (sp) {
+        if (!bestPreview && sp.preview) bestPreview = sp.preview;
+        if (!bestArt && sp.art) bestArt = sp.art;
+      }
+    } catch {}
+  }
 
-    // 4) Save into our songs array
-    setSongs((prev) => {
-      const idx = prev.findIndex((s) => s.__id === song.__id);
-      if (idx === -1) return prev;
-      const cur = prev[idx];
-      const nextVals = {
-        ...cur,
-        __preview: bestPreview ?? null,
-        __art: bestArt ?? null,
-      };
-      if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
-      const copy = prev.slice();
-      copy[idx] = nextVals;
-      return copy;
-    });
+  if (bestPreview) bestPreview = toHttps(bestPreview);
+  if (bestArt) bestArt = toHttps(bestArt);
 
-    return { preview: bestPreview ?? null, art: bestArt ?? null };
-  },
-  [setSongs, findTrackMeta] // <-- include findTrackMeta here
-);
+  setSongs(prev => {
+    const idx = prev.findIndex(s => s.__id === song.__id);
+    if (idx === -1) return prev;
+    const cur = prev[idx];
+    const nextVals = { ...cur, __preview: bestPreview ?? null, __art: bestArt ?? null };
+    if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
+    const copy = prev.slice();
+    copy[idx] = nextVals;
+    return copy;
+  });
+
+  return { preview: bestPreview ?? null, art: bestArt ?? null };
+}, [setSongs, findTrackMeta]);
 
   // Audio element factory
   const makeAudio = (url) => {
