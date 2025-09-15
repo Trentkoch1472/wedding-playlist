@@ -110,11 +110,6 @@ function shuffle(arr) {
   return a;
 }
 
-// Normalize iTunes URLs to HTTPS to avoid mixed-content blocking on mobile
-function toHttps(u) {
-  return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
-}
-
 /* ========== App ========== */
 export default function App() {
   const fileInputRef = useRef(null);
