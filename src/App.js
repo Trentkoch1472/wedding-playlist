@@ -312,75 +312,92 @@ useEffect(() => {
   }, [previewAudio]);
 
   // Fetch and cache preview URL + cover art, and IMMUTABLY update songs[]
+// Fetch & cache preview URL + cover art (retry if previous result was null)
 const ensureMeta = useCallback(
-  async (song) => {
+  async (song, { force = false } = {}) => {
     if (!song) return null;
 
-    // Already cached?
-    if (song.__preview !== undefined && song.__art !== undefined) {
+    // Only short-circuit when we already have BOTH, and they’re non-null.
+    const haveGoodPreview = typeof song.__preview === "string" && !!song.__preview;
+    const haveArt = typeof song.__art === "string" && !!song.__art;
+    if (!force && haveGoodPreview && haveArt) {
       return { preview: song.__preview, art: song.__art };
     }
 
-    // Try a few query shapes; mobile results can differ from desktop
     const attempts = [
       `${song.artist || ""} ${song.title}`.trim(),
       song.title?.trim(),
       (song.artist || "").trim(),
     ].filter(Boolean);
 
-    let preview = song.__preview ?? null;
-    let art     = song.__art ?? null;
+    let bestPreview = haveGoodPreview ? song.__preview : null;
+    let bestArt = haveArt ? song.__art : null;
 
     for (const q of attempts) {
       try {
-        // Ask for several candidates so we can pick one that actually has a preview
-        const url =
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}` +
-          `&media=music&entity=song&country=US&limit=5`;
-
-        const r = await fetch(url, { mode: "cors", cache: "force-cache" });
-        if (!r.ok) continue;
+        // country=US + entity=song + limit=5, then score best match
+        const r = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
+        );
         const j = await r.json();
+        const results = Array.isArray(j.results) ? j.results : [];
 
-        const best = pickBestItunes(j.results, song.title, song.artist);
-        if (best) {
-          if (!preview && best.previewUrl) preview = toHttps(best.previewUrl);
+        const tn = normalize(song.title);
+        const an = normalize(song.artist || "");
 
-          if (!art) {
+        let bestItem = null;
+        let bestScore = -1;
+        for (const it of results) {
+          const t2 = normalize(it.trackName || "");
+          const a2 = normalize(it.artistName || "");
+          let score = 0;
+          if (t2 === tn) score += 3;
+          if (a2 && an && a2 === an) score += 3;
+          if (t2.includes(tn) || tn.includes(t2)) score += 1;
+          if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
+          if (score > bestScore) {
+            bestScore = score;
+            bestItem = it;
+          }
+        }
+
+        const item = bestItem || results[0];
+        if (item) {
+          if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
+          if (!bestArt) {
             const raw =
-              toHttps(best.artworkUrl100) ||
-              toHttps(best.artworkUrl60)  ||
-              toHttps(best.artworkUrl512) || null;
+              item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
             if (raw) {
-              // upscale typical sizes
-              art = raw
-                .replace(/100x100bb/i, "600x600bb")
-                .replace(/60x60bb/i,  "600x600bb")
-                .replace(/512x512bb/i,"600x600bb");
+              // generic upsize: /100x100bb/ -> /600x600bb/
+              const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
+              bestArt = big || raw;
             }
           }
         }
 
-        // If we found either, we're good enough
-        if (preview || art) break;
-      } catch (err) {
-        console.warn("Meta fetch failed for", q, err);
+        if (bestPreview && bestArt) break; // got both, stop early
+      } catch {
+        // try next attempt
       }
     }
 
-    // Cache immutably so React re-renders
+    // Immutably persist whatever we found (even if one of them is still null)
     setSongs((prev) => {
       const idx = prev.findIndex((s) => s.__id === song.__id);
       if (idx === -1) return prev;
       const cur = prev[idx];
-      const next = { ...cur, __preview: preview ?? null, __art: art ?? null };
-      if (cur.__preview === next.__preview && cur.__art === next.__art) return prev;
+      const nextVals = {
+        ...cur,
+        __preview: bestPreview ?? null,
+        __art: bestArt ?? null,
+      };
+      if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
       const copy = prev.slice();
-      copy[idx] = next;
+      copy[idx] = nextVals;
       return copy;
     });
 
-    return { preview, art };
+    return { preview: bestPreview ?? null, art: bestArt ?? null };
   },
   [setSongs]
 );
@@ -479,12 +496,20 @@ const ensureMeta = useCallback(
     };
   }, [previewAudio]);
 
-  // prefetch current + next preview URL to reduce blocking
+// prefetch current + next preview; retry if either preview or art is missing
 useEffect(() => {
-  ensureMeta(current);
-  ensureMeta(nextSong);
-  if (songs[index + 2]) ensureMeta(songs[index + 2]);
-}, [current, nextSong, ensureMeta, songs, index]);
+  if (current) {
+    const hasPreview = !!current.__preview;
+    const hasArt = !!current.__art;
+    ensureMeta(current, { force: !(hasPreview && hasArt) });
+  }
+  if (nextSong) {
+    const hasPreview = !!nextSong.__preview;
+    const hasArt = !!nextSong.__art;
+    ensureMeta(nextSong, { force: !(hasPreview && hasArt) });
+  }
+}, [current, nextSong, ensureMeta]);
+
 
   /* ---- swipe logic ---- */
   const flingAndCommit = useCallback(
