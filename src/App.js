@@ -35,34 +35,8 @@ function toHttps(u) {
   return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
 }
 
-// Choose the best iTunes hit that actually has a preview/art
-function pickBestItunes(items, wantTitle, wantArtist) {
-  const nt = (wantTitle || "").toLowerCase();
-  const na = (wantArtist || "").toLowerCase();
-
-  // Prefer: has preview, then artwork, then title/artist similarity
-  let best = null;
-  let bestScore = -1;
-
-  for (const it of items || []) {
-    const t = (it.trackName || "").toLowerCase();
-    const a = (it.artistName || "").toLowerCase();
-
-    let score = 0;
-    if (it.previewUrl) score += 3;
-    if (it.artworkUrl100 || it.artworkUrl60 || it.artworkUrl512) score += 2;
-
-    // Light-weight matching bonus
-    if (t && nt && (t.includes(nt) || nt.includes(t))) score += 2;
-    if (a && na && (a.includes(na) || na.includes(a))) score += 2;
-
-    if (score > bestScore) {
-      best = it;
-      bestScore = score;
-    }
-  }
-  return best;
-}
+// iOS check in module scope to avoid hook dependency warnings
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 function download(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -118,40 +92,41 @@ export default function App() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportMenuRef = useRef(null);
   // Upload dropdown state
-const [uploadOpen, setUploadOpen] = useState(false);
-const uploadMenuRef = useRef(null);
-const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
-// Handlers for Upload menu
-const triggerUploadAdd = () => {
-  requirePro(() => {
-    pendingUploadModeRef.current = "add";
-    fileInputRef.current?.click();
-    setUploadOpen(false);
-  });
-};
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const uploadMenuRef = useRef(null);
+  const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
 
-const triggerUploadReplace = () => {
-  requirePro(() => {
-    pendingUploadModeRef.current = "replace";
-    fileInputRef.current?.click();
-    setUploadOpen(false);
-  });
-};
+  // Handlers for Upload menu
+  const triggerUploadAdd = () => {
+    requirePro(() => {
+      pendingUploadModeRef.current = "add";
+      fileInputRef.current?.click();
+      setUploadOpen(false);
+    });
+  };
 
-// close the Upload menu on outside click / ESC
-useEffect(() => {
-  const onDocClick = (e) => {
-    if (!uploadMenuRef.current) return;
-    if (!uploadMenuRef.current.contains(e.target)) setUploadOpen(false);
+  const triggerUploadReplace = () => {
+    requirePro(() => {
+      pendingUploadModeRef.current = "replace";
+      fileInputRef.current?.click();
+      setUploadOpen(false);
+    });
   };
-  const onKey = (e) => e.key === "Escape" && setUploadOpen(false);
-  document.addEventListener("click", onDocClick);
-  document.addEventListener("keydown", onKey);
-  return () => {
-    document.removeEventListener("click", onDocClick);
-    document.removeEventListener("keydown", onKey);
-  };
-}, []);
+
+  // close the Upload menu on outside click / ESC
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!uploadMenuRef.current) return;
+      if (!uploadMenuRef.current.contains(e.target)) setUploadOpen(false);
+    };
+    const onKey = (e) => e.key === "Escape" && setUploadOpen(false);
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   useEffect(() => {
     const onDocClick = (e) => {
@@ -166,31 +141,31 @@ useEffect(() => {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
-    // Set browser tab title
+
+  // Set browser tab title
   useEffect(() => {
     document.title = "Swipe to Dance";
   }, []);
 
+  // --- Spotify redirect: use the exact current page URL (no trailing slash) ---
+  const SPOTIFY_REDIRECT_URI = (() => {
+    const u = new URL(window.location.href);
+    const exact = u.origin + u.pathname.replace(/\/$/, ""); // strip trailing slash
+    console.log("Using Spotify redirect:", exact);
+    return exact;
+  })();
 
-// --- Spotify redirect: use the exact current page URL (no trailing slash) ---
-const SPOTIFY_REDIRECT_URI = (() => {
-  const u = new URL(window.location.href);
-  const exact = u.origin + u.pathname.replace(/\/$/, ""); // strip trailing slash
-  console.log("Using Spotify redirect:", exact);
-  return exact;
-})();
-
-const {
-  user: spUser,
-  busy: spBusy,
-  msg: spMsg,
-  login: spotifyLogin,
-  exportToSpotify,
-  findTrackMeta,
-} = useSpotify({
-  clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri: SPOTIFY_REDIRECT_URI,
-});
+  const {
+    user: spUser,
+    busy: spBusy,
+    msg: spMsg,
+    login: spotifyLogin,
+    exportToSpotify,
+    findTrackMeta,
+  } = useSpotify({
+    clientId: "7ced125c87d944d09bb2a301f8576fb8",
+    redirectUri: SPOTIFY_REDIRECT_URI,
+  });
 
   // Local storage state
   function useLocalState(key, initial) {
@@ -215,44 +190,47 @@ const {
   const [index, setIndex] = useLocalState("wps_index", 0);
   const [choices, setChoices] = useLocalState("wps_choices", {});
   // Donation prompt (show once per browser unless cleared)
-const [coffeeOpen, setCoffeeOpen] = useState(false);
-const [coffeeOffered, setCoffeeOffered] = useLocalState("wps_coffee_offered", false);
+  const [coffeeOpen, setCoffeeOpen] = useState(false);
+  const [coffeeOffered, setCoffeeOffered] = useLocalState("wps_coffee_offered", false);
 
-const maybeOfferCoffee = useCallback(() => {
-  if (coffeeOffered) return;
-  setCoffeeOpen(true);
-  setCoffeeOffered(true);
-}, [coffeeOffered, setCoffeeOffered]);
+  const maybeOfferCoffee = useCallback(() => {
+    if (coffeeOffered) return;
+    setCoffeeOpen(true);
+    setCoffeeOffered(true);
+  }, [coffeeOffered, setCoffeeOffered]);
 
   // --- Pro gating ---
-const [proUnlocked, setProUnlocked] = useLocalState("wps_pro", false);
-const [payOpen, setPayOpen] = useState(false);
-const pendingActionRef = useRef(null);
+  const [proUnlocked, setProUnlocked] = useLocalState("wps_pro", false);
+  const [payOpen, setPayOpen] = useState(false);
+  const pendingActionRef = useRef(null);
 
-const requirePro = useCallback((fn) => {
-  if (proUnlocked) {
-    fn();
-  } else {
-    pendingActionRef.current = fn;
-    setPayOpen(true);
-  }
-}, [proUnlocked]);
+  const requirePro = useCallback(
+    (fn) => {
+      if (proUnlocked) {
+        fn();
+      } else {
+        pendingActionRef.current = fn;
+        setPayOpen(true);
+      }
+    },
+    [proUnlocked]
+  );
 
-const unlockPro = useCallback(() => {
-  setProUnlocked(true);
-  setPayOpen(false);
-  if (typeof pendingActionRef.current === "function") {
-    const run = pendingActionRef.current;
+  const unlockPro = useCallback(() => {
+    setProUnlocked(true);
+    setPayOpen(false);
+    if (typeof pendingActionRef.current === "function") {
+      const run = pendingActionRef.current;
+      pendingActionRef.current = null;
+      // run after a tick (so modal can close smoothly)
+      setTimeout(() => run(), 50);
+    }
+  }, [setProUnlocked]);
+
+  const cancelPay = useCallback(() => {
     pendingActionRef.current = null;
-    // run after a tick (so modal can close smoothly)
-    setTimeout(() => run(), 50);
-  }
-}, [setProUnlocked]);
-
-const cancelPay = useCallback(() => {
-  pendingActionRef.current = null;
-  setPayOpen(false);
-}, []);
+    setPayOpen(false);
+  }, []);
 
   // Theme for cards
   const themes = [
@@ -273,19 +251,18 @@ const cancelPay = useCallback(() => {
 
   const [fling, setFling] = useState({ active: false, toX: 0, toY: 0, rotate: 0, id: null });
   // Toast state + helper
-const [toast, setToast] = useState("");
-const toastTimerRef = useRef(null);
-const showToast = useCallback((text) => {
-  setToast(text);
-  if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-  toastTimerRef.current = setTimeout(() => setToast(""), 2800);
-}, []);
-useEffect(() => {
-  return () => {
+  const [toast, setToast] = useState("");
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((text) => {
+    setToast(text);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-  };
-}, []);
-
+    toastTimerRef.current = setTimeout(() => setToast(""), 2800);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   // Derived lists
   const yesList = useMemo(
@@ -312,93 +289,98 @@ useEffect(() => {
     setPreviewing(false);
   }, [previewAudio]);
 
-// Fetch & cache preview URL + cover art (retry if previous result was null)
-// REPLACE your existing ensureMeta with this whole block:
-const ensureMeta = useCallback(async (song, { force = false } = {}) => {
-  if (!song) return null;
+  // Fetch & cache preview URL + cover art (retry if previous result was null)
+  const ensureMeta = useCallback(
+    async (song, { force = false } = {}) => {
+      if (!song) return null;
 
-  const havePreview = typeof song.__preview === "string" && song.__preview;
-  const haveArt = typeof song.__art === "string" && song.__art;
-  if (!force && havePreview && haveArt) {
-    return { preview: song.__preview, art: song.__art };
-  }
-
-  const attempts = [
-    `${song.artist || ""} ${song.title}`.trim(),
-    song.title?.trim(),
-    (song.artist || "").trim(),
-  ].filter(Boolean);
-
-  let bestPreview = havePreview ? song.__preview : null;
-  let bestArt = haveArt ? song.__art : null;
-
-  // Try iTunes first
-  for (const q of attempts) {
-    try {
-      const r = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
-      );
-      const j = await r.json();
-      const results = Array.isArray(j.results) ? j.results : [];
-
-      const tn = normalize(song.title);
-      const an = normalize(song.artist || "");
-
-      let bestItem = null;
-      let bestScore = -1;
-      for (const it of results) {
-        const t2 = normalize(it.trackName || "");
-        const a2 = normalize(it.artistName || "");
-        let score = 0;
-        if (t2 === tn) score += 3;
-        if (a2 && an && a2 === an) score += 3;
-        if (t2.includes(tn) || tn.includes(t2)) score += 1;
-        if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
-        if (score > bestScore) { bestScore = score; bestItem = it; }
+      const havePreview = typeof song.__preview === "string" && song.__preview;
+      const haveArt = typeof song.__art === "string" && song.__art;
+      if (!force && havePreview && haveArt) {
+        return { preview: song.__preview, art: song.__art };
       }
 
-      const item = bestItem || results[0];
-      if (item) {
-        if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
-        if (!bestArt) {
-          const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
-          if (raw) {
-            const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
-            bestArt = big || raw;
+      const attempts = [
+        `${song.artist || ""} ${song.title}`.trim(),
+        song.title?.trim(),
+        (song.artist || "").trim(),
+      ].filter(Boolean);
+
+      let bestPreview = havePreview ? song.__preview : null;
+      let bestArt = haveArt ? song.__art : null;
+
+      // Try iTunes first
+      for (const q of attempts) {
+        try {
+          const r = await fetch(
+            `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
+          );
+          const j = await r.json();
+          const results = Array.isArray(j.results) ? j.results : [];
+
+          const tn = normalize(song.title);
+          const an = normalize(song.artist || "");
+
+          let bestItem = null;
+          let bestScore = -1;
+          for (const it of results) {
+            const t2 = normalize(it.trackName || "");
+            const a2 = normalize(it.artistName || "");
+            let score = 0;
+            if (t2 === tn) score += 3;
+            if (a2 && an && a2 === an) score += 3;
+            if (t2.includes(tn) || tn.includes(t2)) score += 1;
+            if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
+            if (score > bestScore) {
+              bestScore = score;
+              bestItem = it;
+            }
           }
-        }
+
+          const item = bestItem || results[0];
+          if (item) {
+            if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
+            if (!bestArt) {
+              const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
+              if (raw) {
+                const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
+                bestArt = big || raw;
+              }
+            }
+          }
+          if (bestPreview && bestArt) break;
+        } catch {}
       }
-      if (bestPreview && bestArt) break;
-    } catch {}
-  }
 
-  // Spotify fallback (needs token)
-  if ((!bestPreview || !bestArt) && findTrackMeta) {
-    try {
-      const sp = await findTrackMeta(song.title, song.artist);
-      if (sp) {
-        if (!bestPreview && sp.preview) bestPreview = sp.preview;
-        if (!bestArt && sp.art) bestArt = sp.art;
+      // Spotify fallback (needs token)
+      if ((!bestPreview || !bestArt) && findTrackMeta) {
+        try {
+          const sp = await findTrackMeta(song.title, song.artist);
+          if (sp) {
+            if (!bestPreview && sp.preview) bestPreview = sp.preview;
+            if (!bestArt && sp.art) bestArt = sp.art;
+          }
+        } catch {}
       }
-    } catch {}
-  }
 
-  if (bestPreview) bestPreview = toHttps(bestPreview);
-  if (bestArt) bestArt = toHttps(bestArt);
+      if (bestPreview) bestPreview = toHttps(bestPreview);
+      if (bestArt) bestArt = toHttps(bestArt);
 
-  setSongs(prev => {
-    const idx = prev.findIndex(s => s.__id === song.__id);
-    if (idx === -1) return prev;
-    const cur = prev[idx];
-    const nextVals = { ...cur, __preview: bestPreview ?? null, __art: bestArt ?? null };
-    if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
-    const copy = prev.slice();
-    copy[idx] = nextVals;
-    return copy;
-  });
+      setSongs((prev) => {
+        const idx = prev.findIndex((s) => s.__id === song.__id);
+        if (idx === -1) return prev;
+        const cur = prev[idx];
+        const nextVals = { ...cur, __preview: bestPreview ?? null, __art: bestArt ?? null };
+        if (cur.__preview === nextVals.__preview && cur.__art === nextVals.__art) return prev;
+        const copy = prev.slice();
+        copy[idx] = nextVals;
+        return copy;
+      });
 
-  return { preview: bestPreview ?? null, art: bestArt ?? null };
-}, [setSongs, findTrackMeta]);
+      return { preview: bestPreview ?? null, art: bestArt ?? null };
+    },
+    [setSongs, findTrackMeta]
+  );
 
   // Audio element factory
   const makeAudio = (url) => {
@@ -437,42 +419,52 @@ const ensureMeta = useCallback(async (song, { force = false } = {}) => {
     }
   };
 
-  const togglePreview = useCallback(async () => {
-  if (previewing) {
-    stopPreview();
-    return;
-  }
+  const togglePreview = useCallback(
+    async () => {
+      if (previewing) {
+        stopPreview();
+        return;
+      }
 
-  const song = current;
-  if (!song) return;
+      const song = current;
+      if (!song) return;
 
-  // If we don't have a preview yet, try to fetch it now.
-  if (!song.__preview) {
-    setPreviewPreparing(true);
-    const meta = await ensureMeta(song).catch(() => null);
-    setPreviewPreparing(false);
+      // If we don't have a preview, fetch it now
+      if (!song.__preview) {
+        setPreviewPreparing(true);
+        await ensureMeta(song).catch(() => null);
+        setPreviewPreparing(false);
 
-    // If still no preview after fetching, let the user know and bail.
-    if (!meta?.preview) {
-      alert("No 30s preview available for this track.");
-      return;
-    }
+        // Read the latest song state in case ensureMeta updated it
+        const updated = songs.find((s) => s.__id === song.__id);
+        const url = updated?.__preview ? toHttps(updated.__preview) : null;
 
-    // Try playing immediately. Some mobile browsers still require a second tap,
-    // in which case our tryPlay() will show a helpful message.
-    const a = makeAudio(toHttps(meta.preview));
-    setPreviewAudio(a);
-    setPreviewing(true);
-    await tryPlay(a);
-    return;
-  }
+        if (!url) {
+          alert("No 30s preview available for this track.");
+          return;
+        }
 
-  // We have a cached preview: play immediately.
-  const a = makeAudio(toHttps(song.__preview));
-  setPreviewAudio(a);
-  setPreviewing(true);
-  await tryPlay(a);
-}, [previewing, stopPreview, current, ensureMeta]);
+        if (IS_IOS) {
+          // iOS needs a second user tap to play after a network await
+          showToast("Snippet ready, tap again to play");
+          return;
+        }
+
+        const a = makeAudio(url);
+        setPreviewAudio(a);
+        setPreviewing(true);
+        await tryPlay(a);
+        return;
+      }
+
+      // We have a cached preview: play immediately
+      const a = makeAudio(toHttps(song.__preview));
+      setPreviewAudio(a);
+      setPreviewing(true);
+      await tryPlay(a);
+    },
+    [previewing, stopPreview, current, ensureMeta, songs, showToast]
+  );
 
   // stop preview when changing card
   useEffect(() => {
@@ -494,20 +486,19 @@ const ensureMeta = useCallback(async (song, { force = false } = {}) => {
     };
   }, [previewAudio]);
 
-// prefetch current + next preview; retry if either preview or art is missing
-useEffect(() => {
-  if (current) {
-    const hasPreview = !!current.__preview;
-    const hasArt = !!current.__art;
-    ensureMeta(current, { force: !(hasPreview && hasArt) });
-  }
-  if (nextSong) {
-    const hasPreview = !!nextSong.__preview;
-    const hasArt = !!nextSong.__art;
-    ensureMeta(nextSong, { force: !(hasPreview && hasArt) });
-  }
-}, [current, nextSong, ensureMeta]);
-
+  // prefetch current + next preview; retry if either preview or art is missing
+  useEffect(() => {
+    if (current) {
+      const hasPreview = !!current.__preview;
+      const hasArt = !!current.__art;
+      ensureMeta(current, { force: !(hasPreview && hasArt) });
+    }
+    if (nextSong) {
+      const hasPreview = !!nextSong.__preview;
+      const hasArt = !!nextSong.__art;
+      ensureMeta(nextSong, { force: !(hasPreview && hasArt) });
+    }
+  }, [current, nextSong, ensureMeta]);
 
   /* ---- swipe logic ---- */
   const flingAndCommit = useCallback(
@@ -639,71 +630,74 @@ useEffect(() => {
   }, [onNo, onYes, onStar, onUndo, onSkip]);
 
   // file ingestion
-const handleFiles = async (file, mode = "replace") => {
-  if (!file) return;
-  const ext = file.name.split(".").pop().toLowerCase();
-  const text = await file.text();
+  const handleFiles = async (file, mode = "replace") => {
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    const text = await file.text();
 
-  let rows = [];
-  if (ext === "csv") {
-    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-    rows = parsed.data;
-  } else if (ext === "jsonl" || ext === "ndjson") {
-    rows = parseJSONL(text);
-  } else if (ext === "json") {
-    try { rows = JSON.parse(text); } catch { rows = []; }
-  } else {
-    alert("Unsupported file type. Please upload CSV, JSON, or JSONL.");
-    return;
-  }
-
-  const mapped = rows
-    .map((r) => {
-      const title = r.title ?? r.song ?? r.Song ?? r["Song Title"] ?? r["Track"] ?? "";
-      const artist = r.artist ?? r.Artist ?? r.singer ?? r["Performer"] ?? "";
-      const bpm = r.bpm ?? r.BPM ?? r.tempo ?? undefined;
-      const decade = r.decade ?? r.Decade ?? undefined;
-      const genre = r.genre ?? r.Genre ?? undefined;
-      return { __id: uid(), title: String(title).trim(), artist: String(artist || "").trim(), bpm, decade, genre };
-    })
-    .filter((r) => r.title);
-
-  const clean = dedupeSongs(mapped);
-
-  if (mode === "add") {
-    setSongs((prev) => {
-      const before = prev.length;
-      const next = dedupeSongs([...prev, ...clean]);
-      const added = next.length - before;
-      if (added > 0) {
-        showToast(`${added} ${added === 1 ? "song" : "songs"} added`);
-      } else {
-        showToast("No new songs added (all duplicates)");
+    let rows = [];
+    if (ext === "csv") {
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      rows = parsed.data;
+    } else if (ext === "jsonl" || ext === "ndjson") {
+      rows = parseJSONL(text);
+    } else if (ext === "json") {
+      try {
+        rows = JSON.parse(text);
+      } catch {
+        rows = [];
       }
-      return next;
-    });
-  } else {
-    setSongs(clean);
-    setIndex(0);
-    setChoices({});
-    showToast(`Replaced with ${clean.length} ${clean.length === 1 ? "song" : "songs"}`);
-  }
-};
+    } else {
+      alert("Unsupported file type. Please upload CSV, JSON, or JSONL.");
+      return;
+    }
+
+    const mapped = rows
+      .map((r) => {
+        const title = r.title ?? r.song ?? r.Song ?? r["Song Title"] ?? r["Track"] ?? "";
+        const artist = r.artist ?? r.Artist ?? r.singer ?? r["Performer"] ?? "";
+        const bpm = r.bpm ?? r.BPM ?? r.tempo ?? undefined;
+        const decade = r.decade ?? r.Decade ?? undefined;
+        const genre = r.genre ?? r.Genre ?? undefined;
+        return { __id: uid(), title: String(title).trim(), artist: String(artist || "").trim(), bpm, decade, genre };
+      })
+      .filter((r) => r.title);
+
+    const clean = dedupeSongs(mapped);
+
+    if (mode === "add") {
+      setSongs((prev) => {
+        const before = prev.length;
+        const next = dedupeSongs([...prev, ...clean]);
+        const added = next.length - before;
+        if (added > 0) {
+          showToast(`${added} ${added === 1 ? "song" : "songs"} added`);
+        } else {
+          showToast("No new songs added (all duplicates)");
+        }
+        return next;
+      });
+    } else {
+      setSongs(clean);
+      setIndex(0);
+      setChoices({});
+      showToast(`Replaced with ${clean.length} ${clean.length === 1 ? "song" : "songs"}`);
+    }
+  };
 
   // 1) Full playlist export (CSV)
-const exportPlaylist = () => {
-  const approved = yesList.filter((s) => !starList.includes(s));
-  const ordered = [...starList, ...approved];
-  if (!ordered.length) {
-    alert("No songs to export yet. Approve or star some songs first.");
-    return;
-  }
-  const rows = ordered.map((s) => ({ title: s.title, artist: s.artist || "" }));
-  const csv = Papa.unparse(rows);
-  download("playlist.csv", csv);
-  maybeOfferCoffee(); // show donation prompt (once per browser)
-};
-
+  const exportPlaylist = () => {
+    const approved = yesList.filter((s) => !starList.includes(s));
+    const ordered = [...starList, ...approved];
+    if (!ordered.length) {
+      alert("No songs to export yet. Approve or star some songs first.");
+      return;
+    }
+    const rows = ordered.map((s) => ({ title: s.title, artist: s.artist || "" }));
+    const csv = Papa.unparse(rows);
+    download("playlist.csv", csv);
+    maybeOfferCoffee(); // show donation prompt (once per browser)
+  };
 
   const handleExportToSpotify = useCallback(async () => {
     if (!starList.length && !yesList.length) {
@@ -717,19 +711,15 @@ const exportPlaylist = () => {
     const url = await exportToSpotify(starList, yesList);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }, [spUser, spotifyLogin, exportToSpotify, starList, yesList]);
-  const onExportSpotify = useCallback(() => {
-  requirePro(() => { void handleExportToSpotify(); });
-}, [requirePro, handleExportToSpotify]);
-
 
   // 2) Buckets export (3 CSVs)
-const exportBuckets = () => {
-  const toCSV = (arr) => Papa.unparse(arr.map((s) => ({ title: s.title, artist: s.artist })));
-  download("must-haves.csv", toCSV(starList));
-  download("approved.csv", toCSV(yesList.filter((s) => !starList.includes(s))));
-  download("no-thanks.csv", toCSV(noList));
-  maybeOfferCoffee(); // show donation prompt (once per browser)
-};
+  const exportBuckets = () => {
+    const toCSV = (arr) => Papa.unparse(arr.map((s) => ({ title: s.title, artist: s.artist })));
+    download("must-haves.csv", toCSV(starList));
+    download("approved.csv", toCSV(yesList.filter((s) => !starList.includes(s))));
+    download("no-thanks.csv", toCSV(noList));
+    maybeOfferCoffee(); // show donation prompt (once per browser)
+  };
 
   const resetAll = () => {
     stopPreview();
@@ -761,108 +751,106 @@ const exportBuckets = () => {
     <div className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-sky-50 text-slate-900">
       <header className="sticky top-0 z-10 backdrop-blur bg-gradient-to-r from-rose-50 to-sky-50 border-b border-pink-200/60">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-         <h1 className="text-xl font-semibold text-pink-900">Swipe to Dance</h1>
+          <h1 className="text-xl font-semibold text-pink-900">Swipe to Dance</h1>
 
-<div className="ml-auto flex items-center gap-2">
- {/* Upload (with Add / Replace menu) */}
-<div className="relative" ref={uploadMenuRef}>
- <button
-  onClick={() => setUploadOpen((v) => !v)}
-  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-pink-200 text-pink-900 text-sm hover:bg-pink-300"
->
-  <Upload size={16} /> Upload your own songs <span className="text-pink-800/80">(Pro)</span>
-</button>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Upload (with Add / Replace menu) */}
+            <div className="relative" ref={uploadMenuRef}>
+              <button
+                onClick={() => setUploadOpen((v) => !v)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-pink-200 text-pink-900 text-sm hover:bg-pink-300"
+              >
+                <Upload size={16} /> Upload your own songs <span className="text-pink-800/80">(Pro)</span>
+              </button>
 
-  {uploadOpen && (
-    <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-      <button
-  className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-  onClick={triggerUploadAdd}
->
-  Add to existing songs <span className="text-pink-700/70">(Pro)</span>
-</button>
-     <button
-  className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-  onClick={triggerUploadReplace}
->
-  Replace songs <span className="text-pink-700/70">(Pro)</span>
-</button>
-    </div>
-  )}
-</div>
+              {uploadOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                    onClick={triggerUploadAdd}
+                  >
+                    Add to existing songs <span className="text-pink-700/70">(Pro)</span>
+                  </button>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                    onClick={triggerUploadReplace}
+                  >
+                    Replace songs <span className="text-pink-700/70">(Pro)</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
-<input
-  ref={fileInputRef}
-  type="file"
-  accept=".csv,.json,.jsonl,.ndjson"
-  className="hidden"
-  onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
-/>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.json,.jsonl,.ndjson"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
+            />
 
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setExportOpen((v) => !v)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-200 text-sky-900 text-sm hover:bg-sky-300 disabled:opacity-50"
+                disabled={!songs.length}
+              >
+                <Download size={16} /> Export
+              </button>
 
-  <div className="relative" ref={exportMenuRef}>
-    <button
-      onClick={() => setExportOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-200 text-sky-900 text-sm hover:bg-sky-300 disabled:opacity-50"
-      disabled={!songs.length}
-    >
-      <Download size={16} /> Export
-    </button>
+              {exportOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                    onClick={() => {
+                      exportPlaylist();
+                      setExportOpen(false);
+                    }}
+                  >
+                    Export playlist (CSV)
+                  </button>
 
-    {exportOpen && (
-      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportPlaylist();
-            setExportOpen(false);
-          }}
-        >
-          Export playlist (CSV)
-        </button>
+                  <button
+                    className="w-full px-3 py-2 text-sm hover:bg-sky-50 disabled:opacity-50 flex items-center justify-between"
+                    onClick={() => {
+                      requirePro(() => {
+                        void handleExportToSpotify();
+                      }); // gate with Pro
+                      setExportOpen(false);
+                    }}
+                    disabled={spBusy}
+                  >
+                    <span className="text-left">
+                      Export to Spotify <span className="text-pink-700/70">(Pro)</span> {spBusy ? "…" : ""}
+                    </span>
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs">
+                      <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
+                      <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
+                        {spUser ? "connected" : "not connected"}
+                      </span>
+                    </span>
+                  </button>
 
-       <button
-  className="w-full px-3 py-2 text-sm hover:bg-sky-50 disabled:opacity-50 flex items-center justify-between"
-  onClick={() => {
-    requirePro(() => { void handleExportToSpotify(); }); // gate with Pro
-    setExportOpen(false);
-  }}
-  disabled={spBusy}
->
-  <span className="text-left">
-    Export to Spotify <span className="text-pink-700/70">(Pro)</span> {spBusy ? "…" : ""}
-  </span>
-  <span className="ml-2 inline-flex items-center gap-1 text-xs">
-    <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-    <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
-      {spUser ? "connected" : "not connected"}
-    </span>
-  </span>
-</button>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                    onClick={() => {
+                      exportBuckets();
+                      setExportOpen(false);
+                    }}
+                  >
+                    Export all buckets (3 CSVs)
+                  </button>
+                </div>
+              )}
+            </div>
 
-
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportBuckets();
-            setExportOpen(false);
-          }}
-        >
-          Export all buckets (3 CSVs)
-        </button>
-      </div>
-    )}
-  </div>
-
-  <button
-    onClick={resetAll}
-    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-sky-200 text-sky-900 text-sm hover:bg-sky-50"
-  >
-    Reset
-  </button>
-</div>
-
-
+            <button
+              onClick={resetAll}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-sky-200 text-sky-900 text-sm hover:bg-sky-50"
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
         <div className="h-1 w-full bg-pink-100">
@@ -918,6 +906,7 @@ const exportBuckets = () => {
                         {nextSong.__art ? (
                           <img
                             src={toHttps(nextSong.__art)}
+                            referrerPolicy="no-referrer"
                             alt={`${nextSong.title} cover`}
                             className="mx-auto mt-4 w-28 h-28 rounded-xl shadow-md object-cover"
                             loading="lazy"
@@ -962,7 +951,10 @@ const exportBuckets = () => {
                 {/* current card */}
                 <div
                   key={current ? current.__id : "empty"}
-                  className={`relative rounded-3xl ${theme.bg} shadow-xl border ${theme.border} p-6 md:p-8 min-h-[420px] md:min-h-[480px] flex flex-col justify-between`}
+                  className={`relative rounded-3xl ${theme.bg} shadow-xl border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
+                    "min-h[420px]",
+                    "min-h-[420px]"
+                  )}
                   style={{
                     transform:
                       fling.active && current && fling.id === current.__id
@@ -987,8 +979,10 @@ const exportBuckets = () => {
                       {current.__art ? (
                         <img
                           src={toHttps(current.__art)}
+                          referrerPolicy="no-referrer"
                           alt={`${current.title} cover`}
                           className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
+                          loading="lazy"
                         />
                       ) : null}
 
@@ -1131,74 +1125,65 @@ const exportBuckets = () => {
       <footer className="py-6 text-center text-xs text-slate-500">
         Made for choosing bangers, not ballads only. Choose responsibly.
       </footer>
+
       {coffeeOpen && (
-  <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-    <div className="w-[min(92vw,420px)] rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
-      <h3 className="text-lg font-semibold mb-1">Enjoying Swipe to Dance?</h3>
-      <p className="text-slate-600 mb-4">
-        If this saved you time, you can buy me a coffee ☕
-      </p>
-      <div className="flex items-center justify-end gap-2">
-        <button
-          onClick={() => setCoffeeOpen(false)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm"
-        >
-          Maybe later
-        </button>
-        <a
-          href={DONATION_URL}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => setCoffeeOpen(false)}
-          className="px-3 py-2 rounded-xl bg-amber-200 text-amber-900 hover:bg-amber-300 text-sm"
-        >
-          Buy me a coffee
-        </a>
-      </div>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="w-[min(92vw,420px)] rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
+            <h3 className="text-lg font-semibold mb-1">Enjoying Swipe to Dance?</h3>
+            <p className="text-slate-600 mb-4">If this saved you time, you can buy me a coffee ☕</p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setCoffeeOpen(false)}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm"
+              >
+                Maybe later
+              </button>
+              <a
+                href={DONATION_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setCoffeeOpen(false)}
+                className="px-3 py-2 rounded-xl bg-amber-200 text-amber-900 hover:bg-amber-300 text-sm"
+              >
+                Buy me a coffee
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {payOpen ? (
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-    <div className="absolute inset-0 bg-black/40" onClick={cancelPay} />
-    <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
-      <div className="text-lg font-semibold text-pink-900">Unlock Pro</div>
-      <p className="mt-1 text-sm text-slate-600">
-        Pro lets you <strong>upload your own songs</strong> and <strong>export to Spotify</strong>.
-      </p>
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-pink-100 bg-rose-50/60 p-3">
-        <div>
-          <div className="text-sm font-medium text-pink-900">One-time purchase</div>
-          <div className="text-xs text-pink-800/80">Lifetime access</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={cancelPay} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
+            <div className="text-lg font-semibold text-pink-900">Unlock Pro</div>
+            <p className="mt-1 text-sm text-slate-600">
+              Pro lets you <strong>upload your own songs</strong> and <strong>export to Spotify</strong>.
+            </p>
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-pink-100 bg-rose-50/60 p-3">
+              <div>
+                <div className="text-sm font-medium text-pink-900">One-time purchase</div>
+                <div className="text-xs text-pink-800/80">Lifetime access</div>
+              </div>
+              <div className="text-xl font-bold text-pink-900">$5</div>
+            </div>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+                Not now
+              </button>
+              <button onClick={unlockPro} className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500">
+                Unlock Pro
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="text-xl font-bold text-pink-900">$5</div>
-      </div>
-      <div className="mt-4 flex gap-2 justify-end">
-        <button
-          onClick={cancelPay}
-          className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-        >
-          Not now
-        </button>
-        <button
-          onClick={unlockPro}
-          className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500"
-        >
-          Unlock Pro
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
+      ) : null}
 
       {toast ? (
-  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-    <div className="rounded-xl border border-pink-200 bg-white/95 shadow-lg px-4 py-2 text-sm text-pink-900">
-      {toast}
-    </div>
-  </div>
-) : null}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="rounded-xl border border-pink-200 bg-white/95 shadow-lg px-4 py-2 text-sm text-pink-900">{toast}</div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1207,9 +1192,7 @@ const exportBuckets = () => {
 function Panel({ title, children }) {
   return (
     <div className="rounded-2xl bg-white/90 border border-pink-200 shadow-sm">
-      <div className="px-4 py-3 border-b border-pink-100 bg-rose-50/60 text-pink-900 font-medium rounded-t-2xl">
-        {title}
-      </div>
+      <div className="px-4 py-3 border-b border-pink-100 bg-rose-50/60 text-pink-900 font-medium rounded-t-2xl">{title}</div>
       <div className="p-4">{children}</div>
     </div>
   );
@@ -1238,7 +1221,12 @@ function PeekList({ title, items }) {
             {s.artist ? ` — ${s.artist}` : ""}
           </div>
         ))}
-        {items.length > MAX ? <div className="text-xs text-slate-400">+ {items.length - MAX} more</div> : null}
+
+        {items.length > MAX ? (
+          <div className="text-xs text-slate-400">
+            {`+ ${items.length - MAX} more`}
+          </div>
+        ) : null}
       </div>
     </div>
   );
