@@ -105,13 +105,19 @@ function shuffle(arr) {
 export default function App() {
   const fileInputRef = useRef(null);
 
-  // Export dropdown state
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportMenuRef = useRef(null);
-  // Upload dropdown state
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const uploadMenuRef = useRef(null);
-  const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
+// Export dropdown state
+const [exportOpen, setExportOpen] = useState(false);
+const exportMenuRef = useRef(null);
+// Upload dropdown state
+const [uploadOpen, setUploadOpen] = useState(false);
+const uploadMenuRef = useRef(null);
+const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
+
+// MOBILE: separate dropdown state/refs (only visible on small screens)
+const [mobileExportOpen, setMobileExportOpen] = useState(false);
+const mobileExportMenuRef = useRef(null);
+const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
+const mobileUploadMenuRef = useRef(null);
 
   // Handlers for Upload menu
   const triggerUploadAdd = () => {
@@ -129,6 +135,24 @@ export default function App() {
       setUploadOpen(false);
     });
   };
+
+  // MOBILE triggers (use same file input; just close mobile menu instead)
+const triggerUploadAddMobile = () => {
+  requirePro(() => {
+    pendingUploadModeRef.current = "add";
+    fileInputRef.current?.click();
+    setMobileUploadOpen(false);
+  });
+};
+
+const triggerUploadReplaceMobile = () => {
+  requirePro(() => {
+    pendingUploadModeRef.current = "replace";
+    fileInputRef.current?.click();
+    setMobileUploadOpen(false);
+  });
+};
+
 
   // close the Upload menu on outside click / ESC
   useEffect(() => {
@@ -158,6 +182,31 @@ export default function App() {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+// MOBILE: close menus on outside click / ESC
+useEffect(() => {
+  const onDocClick = (e) => {
+    // close Upload menu if clicking outside
+    if (mobileUploadMenuRef.current && !mobileUploadMenuRef.current.contains(e.target)) {
+      setMobileUploadOpen(false);
+    }
+    // close Export menu if clicking outside
+    if (mobileExportMenuRef.current && !mobileExportMenuRef.current.contains(e.target)) {
+      setMobileExportOpen(false);
+    }
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") {
+      setMobileUploadOpen(false);
+      setMobileExportOpen(false);
+    }
+  };
+  document.addEventListener("click", onDocClick);
+  document.addEventListener("keydown", onKey);
+  return () => {
+    document.removeEventListener("click", onDocClick);
+    document.removeEventListener("keydown", onKey);
+  };
+}, []);
 
   // Set browser tab title
   useEffect(() => {
@@ -780,7 +829,7 @@ const tryPlay = async (audio) => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
          <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto hidden md:flex items-center gap-2">
             {/* Upload (with Add / Replace menu) */}
             <div className="relative" ref={uploadMenuRef}>
               <button
@@ -1132,6 +1181,88 @@ const tryPlay = async (audio) => {
                 </div>
               </div>
             </section>
+{/* Mobile controls under the card */}
+<div className="md:hidden mt-4 flex items-center justify-center gap-2">
+  {/* Upload (mobile) */}
+  <div className="relative" ref={mobileUploadMenuRef}>
+    <button
+      onClick={() => setMobileUploadOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+    >
+      <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
+    </button>
+
+    {mobileUploadOpen && (
+      <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={triggerUploadAddMobile}
+        >
+          Add to existing songs <span className="text-rose-700/70">(Pro)</span>
+        </button>
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={triggerUploadReplaceMobile}
+        >
+          Replace songs <span className="text-rose-700/70">(Pro)</span>
+        </button>
+      </div>
+    )}
+  </div>
+
+  {/* Export (mobile) */}
+  <div className="relative" ref={mobileExportMenuRef}>
+    <button
+      onClick={() => setMobileExportOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      disabled={!songs.length}
+    >
+      <Download size={16} /> Export
+    </button>
+
+    {mobileExportOpen && (
+      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => { exportPlaylist(); setMobileExportOpen(false); }}
+        >
+          Export playlist (CSV)
+        </button>
+
+        <button
+          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
+          onClick={() => { requirePro(() => { void handleExportToSpotify(); }); setMobileExportOpen(false); }}
+          disabled={spBusy}
+        >
+          <span className="text-left">
+            Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
+          </span>
+          <span className="ml-2 inline-flex items-center gap-1 text-xs">
+            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
+            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
+              {spUser ? "connected" : "not connected"}
+            </span>
+          </span>
+        </button>
+
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => { exportBuckets(); setMobileExportOpen(false); }}
+        >
+          Export all buckets (3 CSVs)
+        </button>
+      </div>
+    )}
+  </div>
+
+  {/* Reset (mobile) */}
+  <button
+    onClick={resetAll}
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+  >
+    Reset
+  </button>
+</div>
 
             {/* sidebar under the card (stacked layout) */}
             <aside className="space-y-4">
