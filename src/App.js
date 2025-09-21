@@ -35,8 +35,25 @@ function toHttps(u) {
   return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
 }
 
+// Add this CORS proxy function at the top with your other helper functions
+async function fetchWithCORS(url) {
+  try {
+    // First try direct fetch
+    const response = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit'
+    });
+    return response;
+  } catch (error) {
+    // If direct fetch fails, try with a CORS proxy
+    console.warn('Direct fetch failed, trying CORS proxy:', error);
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    return fetch(proxyUrl);
+  }
+}
+
 // iOS check in module scope to avoid hook dependency warnings
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 function download(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -312,9 +329,8 @@ export default function App() {
       // Try iTunes first
       for (const q of attempts) {
         try {
-          const r = await fetch(
-            `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`
-          );
+         const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
+const r = await fetchWithCORS(url);
           const j = await r.json();
           const results = Array.isArray(j.results) ? j.results : [];
 
@@ -383,41 +399,52 @@ export default function App() {
   );
 
   // Audio element factory
-  const makeAudio = (url) => {
-    const a = new Audio(url);
-    a.preload = "auto";
-    a.onended = () => setPreviewing(false);
-    a.onerror = () => {
-      const code = a.error?.code; // 1=ABORTED,2=NETWORK,3=DECODE,4=SRC_NOT_SUPPORTED
-      console.error("Audio element error", a.error, "url:", url);
-      setPreviewing(false);
-      setPreviewAudio(null);
-      alert(`Audio error (${code ?? "?"}): Couldn't load or decode the preview.`);
-    };
-    return a;
+ const makeAudio = (url) => {
+  const a = new Audio();
+  // Set attributes before src to ensure proper loading
+  a.preload = "auto";
+  a.crossOrigin = "anonymous";
+  a.src = toHttps(url);
+  
+  a.onended = () => setPreviewing(false);
+  a.onerror = () => {
+    const code = a.error?.code;
+    console.error("Audio element error", a.error, "url:", url);
+    setPreviewing(false);
+    setPreviewAudio(null);
+    // More helpful error messages
+    let errorMsg = "Couldn't load the preview.";
+    if (code === 2) errorMsg = "Network error loading preview. Check your connection.";
+    else if (code === 3) errorMsg = "Audio format not supported.";
+    else if (code === 4) errorMsg = "Preview source not available.";
+    alert(errorMsg);
   };
+  return a;
+};
 
-  const tryPlay = async (audio) => {
-    const probe = document.createElement("audio");
-    const supportsAAC =
-      probe.canPlayType('audio/mp4; codecs="mp4a.40.2"') || probe.canPlayType("audio/aac");
-    if (!supportsAAC) {
-      alert("This browser can't play AAC/M4A previews.");
-      return;
+const tryPlay = async (audio) => {
+  try {
+    // For iOS, we need to ensure user interaction
+    if (IS_IOS) {
+      // Reset the audio element for iOS
+      audio.load();
     }
-    try {
-      await audio.play();
-    } catch (err) {
-      console.error("audio.play() failed", err);
-      setPreviewing(false);
-      setPreviewAudio(null);
-      alert(
-        err?.name === "NotAllowedError"
-          ? "Playback was blocked by the browser. Tap the button again."
-          : `Couldn't play the preview. ${err?.message ?? ""}`
-      );
+    
+    await audio.play();
+  } catch (err) {
+    console.error("audio.play() failed", err);
+    setPreviewing(false);
+    setPreviewAudio(null);
+    
+    if (err?.name === "NotAllowedError") {
+      alert("Playback was blocked. Tap the button again to play.");
+    } else if (err?.name === "NotSupportedError") {
+      alert("This audio format is not supported on your device.");
+    } else {
+      alert(`Couldn't play the preview. ${err?.message ?? ""}`);
     }
-  };
+  }
+};
 
   const togglePreview = useCallback(
     async () => {
@@ -978,12 +1005,13 @@ export default function App() {
 
                       {current.__art ? (
                         <img
-                          src={toHttps(current.__art)}
-                          referrerPolicy="no-referrer"
-                          alt={`${current.title} cover`}
-                          className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
-                          loading="lazy"
-                        />
+  src={toHttps(current.__art)}
+  crossOrigin="anonymous"
+  referrerPolicy="no-referrer"
+  alt={`${current.title} cover`}
+  className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
+  loading="lazy"
+/>
                       ) : null}
 
                       {current.artist ? <div className="text-lg text-slate-600 mt-2">{current.artist}</div> : null}
