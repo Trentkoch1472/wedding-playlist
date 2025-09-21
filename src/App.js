@@ -249,13 +249,13 @@ export default function App() {
     setPayOpen(false);
   }, []);
 
-  // Theme for cards
-  const themes = [
-    { bg: "bg-orange-50", border: "border-orange-200" },
-    { bg: "bg-sky-50", border: "border-sky-200" },
-  ];
-  const theme = themes[index % 2];
-  const themeNext = themes[(index + 1) % 2];
+// Theme for cards
+const themes = [
+  { bg: "bg-rose-50", border: "border-rose-200" },
+  { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" }, // very light warm cream
+];
+const theme = themes[index % 2];
+const themeNext = themes[(index + 1) % 2];
 
   const current = songs[index] || null;
   const nextSong = songs[index + 1] || null;
@@ -775,20 +775,21 @@ const tryPlay = async (audio) => {
 
   /* ---------- UI ---------- */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-sky-50 text-slate-900">
-      <header className="sticky top-0 z-10 backdrop-blur bg-gradient-to-r from-rose-50 to-sky-50 border-b border-pink-200/60">
+   <div className="min-h-screen bg-white text-stone-800">
+      <header className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b border-stone-200/30">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-pink-900">Swipe to Dance</h1>
+         <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
 
           <div className="ml-auto flex items-center gap-2">
             {/* Upload (with Add / Replace menu) */}
             <div className="relative" ref={uploadMenuRef}>
               <button
-                onClick={() => setUploadOpen((v) => !v)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-pink-200 text-pink-900 text-sm hover:bg-pink-300"
-              >
-                <Upload size={16} /> Upload your own songs <span className="text-pink-800/80">(Pro)</span>
-              </button>
+  onClick={() => setUploadOpen((v) => !v)}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+>
+  <Upload size={16} /> Upload your own songs <span className="text-rose-700/70">(Pro)</span>
+</button>
+
 
               {uploadOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
@@ -817,13 +818,14 @@ const tryPlay = async (audio) => {
             />
 
             <div className="relative" ref={exportMenuRef}>
-              <button
-                onClick={() => setExportOpen((v) => !v)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-200 text-sky-900 text-sm hover:bg-sky-300 disabled:opacity-50"
-                disabled={!songs.length}
-              >
-                <Download size={16} /> Export
-              </button>
+            <button
+  onClick={() => setExportOpen((v) => !v)}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+  disabled={!songs.length}
+>
+  <Download size={16} /> Export
+</button>
+
 
               {exportOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
@@ -871,18 +873,19 @@ const tryPlay = async (audio) => {
               )}
             </div>
 
-            <button
-              onClick={resetAll}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-sky-200 text-sky-900 text-sm hover:bg-sky-50"
-            >
-              Reset
-            </button>
+       <button
+  onClick={resetAll}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+>
+  Reset
+</button>
+
           </div>
         </div>
 
-        <div className="h-1 w-full bg-pink-100">
-          <div className="h-full bg-pink-400" style={{ width: `${progress * 100}%` }} />
-        </div>
+        <div className="h-0.5 w-full bg-rose-100">
+  <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
+</div>
 
         {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
       </header>
@@ -923,12 +926,12 @@ const tryPlay = async (audio) => {
                     <div
                       className={`relative rounded-3xl ${themeNext.bg} shadow-xl border ${themeNext.border} p-6 md:p-8 min-h-[420px] md:min-h-[480px] flex flex-col justify-between`}
                     >
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm font-light text-stone-400">
                         Song {Math.min(index + 2, songs.length)} of {songs.length} • Remaining {Math.max(remaining - 1, 0)}
                       </div>
 
                       <div className="text-center py-8">
-                        <div className="text-3xl font-bold tracking-tight">{nextSong.title}</div>
+                        <div className="text-2xl font-light tracking-wide text-stone-800">{nextSong.title}</div>
 
                         {nextSong.__art ? (
                           <img
@@ -940,7 +943,7 @@ const tryPlay = async (audio) => {
                           />
                         ) : null}
 
-                        {nextSong.artist ? <div className="text-lg text-slate-600 mt-2">{nextSong.artist}</div> : null}
+                        {nextSong.artist ? <div className="text-base font-light text-stone-500 mt-3">{nextSong.artist}</div> : null}
 
                         <div className="mt-4 flex justify-center gap-3 text-xs text-slate-500">
                           {nextSong.genre ? <span className="px-2 py-1 rounded-full bg-slate-100">{nextSong.genre}</span> : null}
@@ -978,10 +981,10 @@ const tryPlay = async (audio) => {
                 {/* current card */}
                 <div
                   key={current ? current.__id : "empty"}
-                  className={`relative rounded-3xl ${theme.bg} shadow-xl border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
-                    "min-h[420px]",
-                    "min-h-[420px]"
-                  )}
+                className={`relative rounded-3xl ${theme.bg} shadow-xl hover:shadow-2xl hover:shadow-rose-100 transition-shadow border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
+  "min-h[420px]",
+  "min-h-[420px]"
+)}
                   style={{
                     transform:
                       fling.active && current && fling.id === current.__id
@@ -1022,7 +1025,9 @@ const tryPlay = async (audio) => {
                           aria-label="Preview"
                           onClick={togglePreview}
                           disabled={!current || fling.active}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-pink-200 bg-white hover:bg-rose-50 text-sm"
+                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-rose-200 bg-white/90 hover:bg-rose-50 text-sm font-light text-rose-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+
+
                         >
                           {previewing ? <Pause size={16} /> : <Play size={16} />}
                           <span>{previewing ? "Stop snippet" : previewPreparing ? "Preparing…" : "Play snippet"}</span>
@@ -1030,7 +1035,7 @@ const tryPlay = async (audio) => {
                       </div>
 
                       <div className="mt-4 flex justify-center gap-3 text-xs text-slate-500">
-                        {current.genre ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.genre}</span> : null}
+                        {current.genre ? <span className="px-3 py-1 rounded-full bg-stone-100/50 text-xs font-light text-stone-500">{current.genre}</span> : null}
                         {current.decade ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.decade}</span> : null}
                         {current.bpm ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.bpm} BPM</span> : null}
                       </div>
@@ -1038,13 +1043,13 @@ const tryPlay = async (audio) => {
                       {/* overlays */}
                       <div className="pointer-events-none">
                         <div
-                          className="absolute left-4 top-4 text-emerald-700/90 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 text-sm font-medium"
+                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-light"
                           style={{ opacity: yesOpacity }}
                         >
                           ✓ Yes
                         </div>
                         <div
-                          className="absolute right-4 top-4 text-red-700/90 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-sm font-medium"
+                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-light"
                           style={{ opacity: noOpacity }}
                         >
                           ✕ No
@@ -1076,7 +1081,9 @@ const tryPlay = async (audio) => {
                       aria-label="Undo"
                       onClick={onUndo}
                       disabled={fling.active}
-                      className="p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50"
+                     className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+
+
                     >
                       <RotateCcw />
                     </button>
@@ -1084,7 +1091,8 @@ const tryPlay = async (audio) => {
                       aria-label="No"
                       onClick={onNo}
                       disabled={fling.active}
-                      className="p-4 rounded-2xl bg-red-100 text-red-700 hover:bg-red-200"
+                      className="p-4 rounded-full bg-rose-100/50 text-rose-600 hover:bg-rose-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+
                     >
                       <X size={28} />
                     </button>
@@ -1092,7 +1100,8 @@ const tryPlay = async (audio) => {
                       aria-label="Yes"
                       onClick={onYes}
                       disabled={fling.active}
-                      className="p-5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-500"
+                      className="p-5 rounded-full bg-green-100/60 text-green-700 hover:bg-green-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+
                     >
                       <Check size={30} />
                     </button>
@@ -1100,7 +1109,7 @@ const tryPlay = async (audio) => {
                       aria-label="Star"
                       onClick={onStar}
                       disabled={fling.active}
-                      className="p-4 rounded-2xl bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                      className="p-4 rounded-full bg-yellow-50/60 text-yellow-700 hover:bg-yellow-100/60 transition-colors"
                     >
                       <Star size={26} />
                     </button>
@@ -1108,7 +1117,9 @@ const tryPlay = async (audio) => {
                       aria-label="Skip"
                       onClick={onSkip}
                       disabled={fling.active}
-                      className="p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50"
+                     className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+
+
                     >
                       <SkipForward />
                     </button>
@@ -1219,21 +1230,25 @@ const tryPlay = async (audio) => {
 /* ---------- tiny UI helpers ---------- */
 function Panel({ title, children }) {
   return (
-    <div className="rounded-2xl bg-white/90 border border-pink-200 shadow-sm">
-      <div className="px-4 py-3 border-b border-pink-100 bg-rose-50/60 text-pink-900 font-medium rounded-t-2xl">{title}</div>
+    <div className="rounded-xl bg-white border border-rose-200 shadow-none">
+      <div className="px-5 py-3 border-b border-rose-100 bg-rose-50/60 text-rose-800 font-medium rounded-t-xl">
+        {title}
+      </div>
       <div className="p-4">{children}</div>
     </div>
   );
 }
 
+
 function Stat({ label, value }) {
   return (
-    <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
-      <div className="text-2xl font-bold text-sky-900">{value}</div>
-      <div className="text-xs text-sky-700/80">{label}</div>
+    <div className="rounded-lg bg-rose-50 border border-rose-100 p-4">
+      <div className="text-2xl font-semibold text-rose-900">{value}</div>
+      <div className="text-xs text-rose-700/80">{label}</div>
     </div>
   );
 }
+
 
 function PeekList({ title, items }) {
   const MAX = 6;
