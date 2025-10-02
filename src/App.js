@@ -225,9 +225,6 @@ export default function App() {
     document.title = "Swipe to Dance";
   }, []);
 
-  // ----- ONE base path + fixed redirect URIs + API base -----
-  const BASE_PATH = "/wedding-playlist";
-
   // Normalize URL so everything lives under /wedding-playlist
   useEffect(() => {
     const { pathname, search, hash } = window.location;
@@ -237,20 +234,21 @@ export default function App() {
     }
   }, []);
 
+// Update the redirect URI logic to remove the path:
 const SPOTIFY_REDIRECT_URI = (() => {
   const { hostname, protocol, port } = window.location;
   
-  // If on localhost, use localhost URL
+  // If on localhost, keep the path for development
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return `${protocol}//${hostname}${port ? ':' + port : ''}/wedding-playlist`;
   }
   
-  // If on custom domain, redirect to GitHub Pages since the app isn't hosted there yet
+  // If on custom domain, no path needed
   if (hostname === 'swipetodance.trentkoch.com') {
-    return 'https://trentkoch1472.github.io/wedding-playlist';
+    return 'https://swipetodance.trentkoch.com';
   }
   
-  // Default to GitHub Pages
+  // GitHub Pages URL
   return 'https://trentkoch1472.github.io/wedding-playlist';
 })();
 
