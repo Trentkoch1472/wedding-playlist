@@ -892,124 +892,116 @@ const handleExportToSpotify = useCallback(async () => {
          <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
 
           <div className="ml-auto hidden md:flex items-center gap-2">
-            {/* Upload (with Add / Replace menu) */}
-            <div className="relative" ref={uploadMenuRef}>
-              <button
-  onClick={() => setUploadOpen((v) => !v)}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
->
-  <Upload size={16} /> Upload your own songs <span className="text-rose-700/70">(Pro)</span>
-</button>
+  {/* Upload (with Add / Replace menu) */}
+  <div className="relative" ref={uploadMenuRef}>
+    <button
+      onClick={() => setUploadOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+    >
+      <Upload size={16} /> Upload your own songs <span className="text-rose-700/70">(Pro)</span>
+    </button>
 
+    {uploadOpen && (
+      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={triggerUploadAdd}
+        >
+          Add to existing songs <span className="text-pink-700/70">(Pro)</span>
+        </button>
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={triggerUploadReplace}
+        >
+          Replace songs <span className="text-pink-700/70">(Pro)</span>
+        </button>
+      </div>
+    )}
+  </div>
 
-              {uploadOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                    onClick={triggerUploadAdd}
-                  >
-                    Add to existing songs <span className="text-pink-700/70">(Pro)</span>
-                  </button>
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                    onClick={triggerUploadReplace}
-                  >
-                    Replace songs <span className="text-pink-700/70">(Pro)</span>
-                  </button>
-                </div>
-              )}
-            </div>
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept=".csv,.json,.jsonl,.ndjson"
+    className="hidden"
+    onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
+  />
 
-           {/* Connect to Spotify (desktop) */}
-<button
-  onClick={spotifyLogin}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60"
-  disabled={!!spUser}
-  title={spUser ? "Spotify connected" : "Connect to Spotify"}
->
-  {spUser ? "Spotify connected" : "Connect to Spotify"}
-</button>
-
-{!spUser && (
+  {/* SINGLE Connect to Spotify (desktop) */}
   <button
-  onClick={spotifyLogin}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-light hover:bg-emerald-200 transition-colors"
->
-  Connect to Spotify
-</button>
+    onClick={() => { if (!spUser) spotifyLogin(); }}
+    disabled={!!spUser}
+    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-light transition-colors ${
+      spUser
+        ? "bg-emerald-100 text-emerald-800 cursor-default"
+        : "bg-emerald-600 text-white hover:bg-emerald-500"
+    }`}
+  >
+    {spUser ? "Spotify connected" : "Connect to Spotify"}
+  </button>
 
-)}
+  {/* Export menu */}
+  <div className="relative" ref={exportMenuRef}>
+    <button
+      onClick={() => setExportOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      disabled={!songs.length}
+    >
+      <Download size={16} /> Export
+    </button>
 
-            <div className="relative" ref={exportMenuRef}>
-            <button
-  onClick={() => setExportOpen((v) => !v)}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-  disabled={!songs.length}
->
-  <Download size={16} /> Export
-</button>
-<button
-  onClick={spotifyLogin}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-  disabled={!!spUser}  // already connected? disable
->
-  {spUser ? "Spotify connected" : "Connect Spotify"}
-</button>
+    {exportOpen && (
+      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => {
+            exportPlaylist();
+            setExportOpen(false);
+          }}
+        >
+          Export playlist (CSV)
+        </button>
 
-              {exportOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                    onClick={() => {
-                      exportPlaylist();
-                      setExportOpen(false);
-                    }}
-                  >
-                    Export playlist (CSV)
-                  </button>
+        <button
+          className="w-full px-3 py-2 text-sm hover:bg-sky-50 disabled:opacity-50 flex items-center justify-between"
+          onClick={() => {
+            requirePro(() => { void handleExportToSpotify(); });
+            setExportOpen(false);
+          }}
+          disabled={spBusy}
+        >
+          <span className="text-left">
+            Export to Spotify <span className="text-pink-700/70">(Pro)</span> {spBusy ? "…" : ""}
+          </span>
+          <span className="ml-2 inline-flex items-center gap-1 text-xs">
+            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
+            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
+              {spUser ? "connected" : "not connected"}
+            </span>
+          </span>
+        </button>
 
-                  <button
-                    className="w-full px-3 py-2 text-sm hover:bg-sky-50 disabled:opacity-50 flex items-center justify-between"
-                    onClick={() => {
-                      requirePro(() => {
-                        void handleExportToSpotify();
-                      }); // gate with Pro
-                      setExportOpen(false);
-                    }}
-                    disabled={spBusy}
-                  >
-                    <span className="text-left">
-                      Export to Spotify <span className="text-pink-700/70">(Pro)</span> {spBusy ? "…" : ""}
-                    </span>
-                    <span className="ml-2 inline-flex items-center gap-1 text-xs">
-                      <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-                      <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
-                        {spUser ? "connected" : "not connected"}
-                      </span>
-                    </span>
-                  </button>
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => {
+            exportBuckets();
+            setExportOpen(false);
+          }}
+        >
+          Export all buckets (3 CSVs)
+        </button>
+      </div>
+    )}
+  </div>
 
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                    onClick={() => {
-                      exportBuckets();
-                      setExportOpen(false);
-                    }}
-                  >
-                    Export all buckets (3 CSVs)
-                  </button>
-                </div>
-              )}
-            </div>
+  <button
+    onClick={resetAll}
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+  >
+    Reset
+  </button>
+</div>
 
-       <button
-  onClick={resetAll}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
->
-  Reset
-</button>
-
-          </div>
         </div>
 
         <div className="h-0.5 w-full bg-rose-100">
