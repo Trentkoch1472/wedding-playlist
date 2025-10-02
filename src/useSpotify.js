@@ -78,7 +78,12 @@ export default function useSpotify({
       (async () => {
         try {
           // Use the same redirect URI that initiated login
-          const lockedRedirect = sessionStorage.getItem(SS_REDIRECT_URI) || redirectUri;
+          const fromStore = sessionStorage.getItem(SS_REDIRECT_URI);
+const lockedRedirect =
+  fromStore && fromStore.startsWith(window.location.origin)
+    ? fromStore
+    : redirectUri;
+
 
           const body = new URLSearchParams({
             grant_type: "authorization_code",

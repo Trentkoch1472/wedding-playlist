@@ -1,39 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#ffffff" />
+ <head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Swipe to Dance" />
 
-    <!-- Content Security Policy: allow our app, Spotify API, Vercel function, and Google Fonts -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="
-        default-src 'self';
-        script-src 'self';
-        connect-src 'self' https://api.spotify.com https://wedding-playlist-zeta.vercel.app;
-        img-src 'self' data: https://i.scdn.co https://*.scdn.co https://is*.mzstatic.com;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-        font-src 'self' https://fonts.gstatic.com data:;
-      "
-    />
+  <!-- ✅ Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src  'self' https://fonts.gstatic.com data:;
+    img-src   'self' data: https://i.scdn.co https://*.scdn.co https://*.mzstatic.com;
+    connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://wedding-playlist-zeta.vercel.app https://itunes.apple.com;
+    media-src 'self' https://*.scdn.co https://audio-ssl.itunes.apple.com data: blob:;
+    frame-ancestors 'none';
+    base-uri 'self';
+    object-src 'none';
+  ">
 
-    <meta
-      name="description"
-      content="Swipe to Dance — quickly sort songs for your party/wedding playlist, then export to CSV or Spotify."
-    />
+  <!-- Optional webfont; allowed by CSP above -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:300,400,700,900" />
 
-    <!-- PWA/manifest bits -->
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
-    <!-- Google Fonts (Lato). Safe with the CSP above. Remove these two lines if you don't want Google Fonts. -->
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700,900&display=swap" rel="stylesheet" />
+  <title>Swipe to Dance</title>
+</head>
 
-    <title>Swipe to Dance</title>
-  </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
