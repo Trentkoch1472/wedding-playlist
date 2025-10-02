@@ -40,13 +40,13 @@ async function fetchWithCORS(url) {
   try {
     // First try direct fetch
     const response = await fetch(url, {
-      mode: 'cors',
-      credentials: 'omit'
+      mode: "cors",
+      credentials: "omit",
     });
     return response;
   } catch (error) {
     // If direct fetch fails, try with a CORS proxy
-    console.warn('Direct fetch failed, trying CORS proxy:', error);
+    console.warn("Direct fetch failed, trying CORS proxy:", error);
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     return fetch(proxyUrl);
   }
@@ -103,21 +103,36 @@ function shuffle(arr) {
 
 /* ========== App ========== */
 export default function App() {
+  const {
+  user: spUser,
+  busy: spBusy,
+  msg: spMsg,
+  login: spotifyLogin,
+  exportToSpotify,
+  findTrackMeta,
+} = useSpotify({
+  clientId: "7ced125c87d944d09bb2a301f8576fb8",
+  redirectUri:
+    window.location.hostname === "swipetodance.trentkoch.com"
+      ? "https://swipetodance.trentkoch.com/wedding-playlist"
+      : "https://trentkoch1472.github.io/wedding-playlist",
+});
+
   const fileInputRef = useRef(null);
 
-// Export dropdown state
-const [exportOpen, setExportOpen] = useState(false);
-const exportMenuRef = useRef(null);
-// Upload dropdown state
-const [uploadOpen, setUploadOpen] = useState(false);
-const uploadMenuRef = useRef(null);
-const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
+  // Export dropdown state
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportMenuRef = useRef(null);
+  // Upload dropdown state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const uploadMenuRef = useRef(null);
+  const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
 
-// MOBILE: separate dropdown state/refs (only visible on small screens)
-const [mobileExportOpen, setMobileExportOpen] = useState(false);
-const mobileExportMenuRef = useRef(null);
-const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
-const mobileUploadMenuRef = useRef(null);
+  // MOBILE: separate dropdown state/refs (only visible on small screens)
+  const [mobileExportOpen, setMobileExportOpen] = useState(false);
+  const mobileExportMenuRef = useRef(null);
+  const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
+  const mobileUploadMenuRef = useRef(null);
 
   // Handlers for Upload menu
   const triggerUploadAdd = () => {
@@ -137,22 +152,21 @@ const mobileUploadMenuRef = useRef(null);
   };
 
   // MOBILE triggers (use same file input; just close mobile menu instead)
-const triggerUploadAddMobile = () => {
-  requirePro(() => {
-    pendingUploadModeRef.current = "add";
-    fileInputRef.current?.click();
-    setMobileUploadOpen(false);
-  });
-};
+  const triggerUploadAddMobile = () => {
+    requirePro(() => {
+      pendingUploadModeRef.current = "add";
+      fileInputRef.current?.click();
+      setMobileUploadOpen(false);
+    });
+  };
 
-const triggerUploadReplaceMobile = () => {
-  requirePro(() => {
-    pendingUploadModeRef.current = "replace";
-    fileInputRef.current?.click();
-    setMobileUploadOpen(false);
-  });
-};
-
+  const triggerUploadReplaceMobile = () => {
+    requirePro(() => {
+      pendingUploadModeRef.current = "replace";
+      fileInputRef.current?.click();
+      setMobileUploadOpen(false);
+    });
+  };
 
   // close the Upload menu on outside click / ESC
   useEffect(() => {
@@ -182,73 +196,97 @@ const triggerUploadReplaceMobile = () => {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
-// MOBILE: close menus on outside click / ESC
-useEffect(() => {
-  const onDocClick = (e) => {
-    // close Upload menu if clicking outside
-    if (mobileUploadMenuRef.current && !mobileUploadMenuRef.current.contains(e.target)) {
-      setMobileUploadOpen(false);
-    }
-    // close Export menu if clicking outside
-    if (mobileExportMenuRef.current && !mobileExportMenuRef.current.contains(e.target)) {
-      setMobileExportOpen(false);
-    }
-  };
-  const onKey = (e) => {
-    if (e.key === "Escape") {
-      setMobileUploadOpen(false);
-      setMobileExportOpen(false);
-    }
-  };
-  document.addEventListener("click", onDocClick);
-  document.addEventListener("keydown", onKey);
-  return () => {
-    document.removeEventListener("click", onDocClick);
-    document.removeEventListener("keydown", onKey);
-  };
-}, []);
+  // MOBILE: close menus on outside click / ESC
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (mobileUploadMenuRef.current && !mobileUploadMenuRef.current.contains(e.target)) {
+        setMobileUploadOpen(false);
+      }
+      if (mobileExportMenuRef.current && !mobileExportMenuRef.current.contains(e.target)) {
+        setMobileExportOpen(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setMobileUploadOpen(false);
+        setMobileExportOpen(false);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   // Set browser tab title
   useEffect(() => {
     document.title = "Swipe to Dance";
   }, []);
 
+  // ----- ONE base path + fixed redirect URIs + API base -----
+  const BASE_PATH = "/wedding-playlist";
 
+  // Normalize URL so everything lives under /wedding-playlist
+  useEffect(() => {
+    const { pathname, search, hash } = window.location;
+    if (!pathname.startsWith(BASE_PATH)) {
+      const next = BASE_PATH + (pathname === "/" ? "" : pathname) + search + hash;
+      window.history.replaceState({}, document.title, next);
+    }
+  }, []);
 
- // ----- ONE base path + fixed redirect URIs + API base -----
-const BASE_PATH = "/wedding-playlist";
-
-// Normalize URL so everything lives under /wedding-playlist
-useEffect(() => {
-  const { pathname, search, hash } = window.location;
-  if (!pathname.startsWith(BASE_PATH)) {
-    const next = BASE_PATH + (pathname === "/" ? "" : pathname) + search + hash;
-    window.history.replaceState({}, document.title, next);
+const SPOTIFY_REDIRECT_URI = (() => {
+  const { hostname, protocol, port } = window.location;
+  
+  // If on localhost, use localhost URL
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `${protocol}//${hostname}${port ? ':' + port : ''}/wedding-playlist`;
   }
-}, []);
+  
+  // If on custom domain, redirect to GitHub Pages since the app isn't hosted there yet
+  if (hostname === 'swipetodance.trentkoch.com') {
+    return 'https://trentkoch1472.github.io/wedding-playlist';
+  }
+  
+  // Default to GitHub Pages
+  return 'https://trentkoch1472.github.io/wedding-playlist';
+})();
 
-const SPOTIFY_REDIRECT_URI =
-  window.location.hostname === "swipetodance.trentkoch.com"
-    ? "https://swipetodance.trentkoch.com/wedding-playlist"
-    : "https://trentkoch1472.github.io/wedding-playlist";
+// Keep your existing auto-start login useEffect as-is
+useEffect(() => {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("connect") === "1") {
+    url.searchParams.delete("connect");
+    window.history.replaceState({}, document.title, url.pathname + (url.searchParams.toString() ? `?${url.searchParams}` : "") + url.hash);
+    if (!spUser) {
+      // kick off Spotify PKCE flow on the SAME origin as redirect_uri
+      spotifyLogin();
+    }
+  }
+}, [spUser, spotifyLogin]);
 
-const API_BASE_URL =
-  /swipetodance\.trentkoch\.com|vercel\.app$/i.test(window.location.hostname)
-    ? ""
-    : "https://wedding-playlist-zeta.vercel.app";
+// One handler to ensure we start on the redirect origin
+const connectToSpotify = useCallback(() => {
+  const currentOrigin = window.location.origin;
+  const redirectOrigin = new URL(SPOTIFY_REDIRECT_URI).origin;
 
+  if (currentOrigin !== redirectOrigin) {
+    // hop to the redirect site and tell it to auto-start login
+    const u = new URL(SPOTIFY_REDIRECT_URI);
+    u.searchParams.set("connect", "1");
+    window.location.assign(u.toString());
+  } else {
+    // already on the right origin — start now
+    spotifyLogin();
+  }
+}, [SPOTIFY_REDIRECT_URI, spotifyLogin]);
 
-  const {
-    user: spUser,
-    busy: spBusy,
-    msg: spMsg,
-    login: spotifyLogin,
-    exportToSpotify,
-    findTrackMeta,
-  } = useSpotify({
-    clientId: "7ced125c87d944d09bb2a301f8576fb8",
-    redirectUri: SPOTIFY_REDIRECT_URI,
-  });
+  const API_BASE_URL =
+    /swipetodance\.trentkoch\.com|vercel\.app$/i.test(window.location.hostname)
+      ? ""
+      : "https://wedding-playlist-zeta.vercel.app";
 
   // Local storage state
   function useLocalState(key, initial) {
@@ -305,7 +343,6 @@ const API_BASE_URL =
     if (typeof pendingActionRef.current === "function") {
       const run = pendingActionRef.current;
       pendingActionRef.current = null;
-      // run after a tick (so modal can close smoothly)
       setTimeout(() => run(), 50);
     }
   }, [setProUnlocked]);
@@ -315,30 +352,29 @@ const API_BASE_URL =
     setPayOpen(false);
   }, []);
 
-const startCheckout = useCallback(async () => {
-  try {
-    const r = await fetch(`${API_BASE_URL}/api/create-checkout-session`, { method: "POST" });
-    const j = await r.json();
-    if (j?.url) {
-      // close modal and go to Stripe
-      setPayOpen(false);
-      window.location.assign(j.url);
-    } else {
-      alert("Couldn't start checkout.");
+  const startCheckout = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/create-checkout-session`, { method: "POST" });
+      const j = await r.json();
+      if (j?.url) {
+        setPayOpen(false);
+        window.location.assign(j.url);
+      } else {
+        alert("Couldn't start checkout.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Checkout error.");
     }
-  } catch (e) {
-    console.error(e);
-    alert("Checkout error.");
-  }
-}, [setPayOpen]);
+  }, [setPayOpen]);
 
-// Theme for cards
-const themes = [
-  { bg: "bg-rose-50", border: "border-rose-200" },
-  { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" }, // very light warm cream
-];
-const theme = themes[index % 2];
-const themeNext = themes[(index + 1) % 2];
+  // Theme for cards
+  const themes = [
+    { bg: "bg-rose-50", border: "border-rose-200" },
+    { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" },
+  ];
+  const theme = themes[index % 2];
+  const themeNext = themes[(index + 1) % 2];
 
   const current = songs[index] || null;
   const nextSong = songs[index + 1] || null;
@@ -364,33 +400,33 @@ const themeNext = themes[(index + 1) % 2];
     };
   }, []);
 
-// Verify Stripe session on return
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const sid = params.get("session_id");
-  if (!sid) return;
+  // Verify Stripe session on return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("session_id");
+    if (!sid) return;
 
-  (async () => {
-    try {
-      const r = await fetch(`${API_BASE_URL}/api/verify-session?session_id=${sid}`);
-      const j = await r.json();
-      if (j.ok) {
-        setProUnlocked(true);
-        showToast("Pro unlocked — thanks!");
-      } else {
-        showToast("Payment not verified. Try again.");
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/api/verify-session?session_id=${sid}`);
+        const j = await r.json();
+        if (j.ok) {
+          setProUnlocked(true);
+          showToast("Pro unlocked — thanks!");
+        } else {
+          showToast("Payment not verified. Try again.");
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("Verification error.");
+      } finally {
+        params.delete("session_id");
+        const qs = params.toString();
+        const clean = window.location.pathname + (qs ? `?${qs}` : "");
+        window.history.replaceState({}, document.title, clean);
       }
-    } catch (e) {
-      console.error(e);
-      showToast("Verification error.");
-    } finally {
-      params.delete("session_id");
-      const qs = params.toString();
-      const clean = window.location.pathname + (qs ? `?${qs}` : "");
-      window.history.replaceState({}, document.title, clean);
-    }
-  })();
-}, [showToast, setProUnlocked]);
+    })();
+  }, [showToast, setProUnlocked]);
 
   // Derived lists
   const yesList = useMemo(
@@ -428,11 +464,7 @@ useEffect(() => {
         return { preview: song.__preview, art: song.__art };
       }
 
-      const attempts = [
-        `${song.artist || ""} ${song.title}`.trim(),
-        song.title?.trim(),
-        (song.artist || "").trim(),
-      ].filter(Boolean);
+      const attempts = [`${song.artist || ""} ${song.title}`.trim(), song.title?.trim(), (song.artist || "").trim()].filter(Boolean);
 
       let bestPreview = havePreview ? song.__preview : null;
       let bestArt = haveArt ? song.__art : null;
@@ -440,8 +472,8 @@ useEffect(() => {
       // Try iTunes first
       for (const q of attempts) {
         try {
-         const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
-const r = await fetchWithCORS(url);
+          const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
+          const r = await fetchWithCORS(url);
           const j = await r.json();
           const results = Array.isArray(j.results) ? j.results : [];
 
@@ -510,99 +542,88 @@ const r = await fetchWithCORS(url);
   );
 
   // Audio element factory
- const makeAudio = (url) => {
-  const a = new Audio();
-  // Set attributes before src to ensure proper loading
-  a.preload = "auto";
-  a.crossOrigin = "anonymous";
-  a.src = toHttps(url);
-  
-  a.onended = () => setPreviewing(false);
-  a.onerror = () => {
-    const code = a.error?.code;
-    console.error("Audio element error", a.error, "url:", url);
-    setPreviewing(false);
-    setPreviewAudio(null);
-    // More helpful error messages
-    let errorMsg = "Couldn't load the preview.";
-    if (code === 2) errorMsg = "Network error loading preview. Check your connection.";
-    else if (code === 3) errorMsg = "Audio format not supported.";
-    else if (code === 4) errorMsg = "Preview source not available.";
-    alert(errorMsg);
+  const makeAudio = (url) => {
+    const a = new Audio();
+    a.preload = "auto";
+    a.crossOrigin = "anonymous";
+    a.src = toHttps(url);
+
+    a.onended = () => setPreviewing(false);
+    a.onerror = () => {
+      const code = a.error?.code;
+      console.error("Audio element error", a.error, "url:", url);
+      setPreviewing(false);
+      setPreviewAudio(null);
+      let errorMsg = "Couldn't load the preview.";
+      if (code === 2) errorMsg = "Network error loading preview. Check your connection.";
+      else if (code === 3) errorMsg = "Audio format not supported.";
+      else if (code === 4) errorMsg = "Preview source not available.";
+      alert(errorMsg);
+    };
+    return a;
   };
-  return a;
-};
 
-const tryPlay = async (audio) => {
-  try {
-    // For iOS, we need to ensure user interaction
-    if (IS_IOS) {
-      // Reset the audio element for iOS
-      audio.load();
-    }
-    
-    await audio.play();
-  } catch (err) {
-    console.error("audio.play() failed", err);
-    setPreviewing(false);
-    setPreviewAudio(null);
-    
-    if (err?.name === "NotAllowedError") {
-      alert("Playback was blocked. Tap the button again to play.");
-    } else if (err?.name === "NotSupportedError") {
-      alert("This audio format is not supported on your device.");
-    } else {
-      alert(`Couldn't play the preview. ${err?.message ?? ""}`);
-    }
-  }
-};
+  const tryPlay = async (audio) => {
+    try {
+      if (IS_IOS) {
+        audio.load();
+      }
 
-  const togglePreview = useCallback(
-    async () => {
-      if (previewing) {
-        stopPreview();
+      await audio.play();
+    } catch (err) {
+      console.error("audio.play() failed", err);
+      setPreviewing(false);
+      setPreviewAudio(null);
+
+      if (err?.name === "NotAllowedError") {
+        alert("Playback was blocked. Tap the button again to play.");
+      } else if (err?.name === "NotSupportedError") {
+        alert("This audio format is not supported on your device.");
+      } else {
+        alert(`Couldn't play the preview. ${err?.message ?? ""}`);
+      }
+    }
+  };
+
+  const togglePreview = useCallback(async () => {
+    if (previewing) {
+      stopPreview();
+      return;
+    }
+
+    const song = current;
+    if (!song) return;
+
+    if (!song.__preview) {
+      setPreviewPreparing(true);
+      await ensureMeta(song).catch(() => null);
+      setPreviewPreparing(false);
+
+      const updated = songs.find((s) => s.__id === song.__id);
+      const url = updated?.__preview ? toHttps(updated.__preview) : null;
+
+      if (!url) {
+        alert("No 30s preview available for this track.");
         return;
       }
 
-      const song = current;
-      if (!song) return;
-
-      // If we don't have a preview, fetch it now
-      if (!song.__preview) {
-        setPreviewPreparing(true);
-        await ensureMeta(song).catch(() => null);
-        setPreviewPreparing(false);
-
-        // Read the latest song state in case ensureMeta updated it
-        const updated = songs.find((s) => s.__id === song.__id);
-        const url = updated?.__preview ? toHttps(updated.__preview) : null;
-
-        if (!url) {
-          alert("No 30s preview available for this track.");
-          return;
-        }
-
-        if (IS_IOS) {
-          // iOS needs a second user tap to play after a network await
-          showToast("Snippet ready, tap again to play");
-          return;
-        }
-
-        const a = makeAudio(url);
-        setPreviewAudio(a);
-        setPreviewing(true);
-        await tryPlay(a);
+      if (IS_IOS) {
+        showToast("Snippet ready, tap again to play");
         return;
       }
 
-      // We have a cached preview: play immediately
-      const a = makeAudio(toHttps(song.__preview));
+      const a = makeAudio(url);
       setPreviewAudio(a);
       setPreviewing(true);
       await tryPlay(a);
-    },
-    [previewing, stopPreview, current, ensureMeta, songs, showToast]
-  );
+      return;
+    }
+
+    const a = makeAudio(toHttps(song.__preview));
+    setPreviewAudio(a);
+    setPreviewing(true);
+    await tryPlay(a);
+  }, [previewing, stopPreview, current, ensureMeta, songs, showToast]);
 
   // stop preview when changing card
   useEffect(() => {
@@ -612,8 +633,7 @@ const tryPlay = async (audio) => {
     } catch {}
     setPreviewAudio(null);
     setPreviewing(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
+  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // cleanup previous audio on change/unmount
   useEffect(() => {
@@ -834,21 +854,24 @@ const tryPlay = async (audio) => {
     const rows = ordered.map((s) => ({ title: s.title, artist: s.artist || "" }));
     const csv = Papa.unparse(rows);
     download("playlist.csv", csv);
-    maybeOfferCoffee(); // show donation prompt (once per browser)
+    maybeOfferCoffee();
   };
 
-const handleExportToSpotify = useCallback(async () => {
-  if (!starList.length && !yesList.length) {
-    alert("No songs to export yet. Approve or star some songs first.");
-    return;
-  }
-  if (!spUser) {
-    alert("Please connect to Spotify first (use the Connect button).");
-    return;
-  }
-  const url = await exportToSpotify(starList, yesList);
-  if (url) window.open(url, "_blank", "noopener,noreferrer");
-}, [spUser, exportToSpotify, starList, yesList]);
+  const handleExportToSpotify = useCallback(
+    async () => {
+      if (!starList.length && !yesList.length) {
+        alert("No songs to export yet. Approve or star some songs first.");
+        return;
+      }
+      if (!spUser) {
+        alert("Please connect to Spotify first (use the Connect button).");
+        return;
+      }
+      const url = await exportToSpotify(starList, yesList);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+    },
+    [spUser, exportToSpotify, starList, yesList]
+  );
 
   // 2) Buckets export (3 CSVs)
   const exportBuckets = () => {
@@ -856,7 +879,7 @@ const handleExportToSpotify = useCallback(async () => {
     download("must-haves.csv", toCSV(starList));
     download("approved.csv", toCSV(yesList.filter((s) => !starList.includes(s))));
     download("no-thanks.csv", toCSV(noList));
-    maybeOfferCoffee(); // show donation prompt (once per browser)
+    maybeOfferCoffee();
   };
 
   const resetAll = () => {
@@ -886,33 +909,29 @@ const handleExportToSpotify = useCallback(async () => {
 
   /* ---------- UI ---------- */
   return (
-   <div className="min-h-screen bg-white text-stone-800">
+    <div className="min-h-screen bg-white text-stone-800">
       <header className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b border-stone-200/30">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-         <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
+          <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
 
-          <div className="ml-auto hidden md:flex items-center gap-2">
-  {/* Upload (with Add / Replace menu) */}
+          {/* RIGHT SIDE (desktop toolbar) */}
+<div className="ml-auto hidden md:flex items-center gap-2">
+  {/* Upload (menu) */}
   <div className="relative" ref={uploadMenuRef}>
     <button
-      onClick={() => setUploadOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      type="button"
+      onClick={() => setUploadOpen(v => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors"
     >
       <Upload size={16} /> Upload your own songs <span className="text-rose-700/70">(Pro)</span>
     </button>
 
     {uploadOpen && (
       <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={triggerUploadAdd}
-        >
+        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAdd}>
           Add to existing songs <span className="text-pink-700/70">(Pro)</span>
         </button>
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={triggerUploadReplace}
-        >
+        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplace}>
           Replace songs <span className="text-pink-700/70">(Pro)</span>
         </button>
       </div>
@@ -927,8 +946,9 @@ const handleExportToSpotify = useCallback(async () => {
     onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
   />
 
-  {/* SINGLE Connect to Spotify (desktop) */}
+  {/* Connect to Spotify (single button) */}
   <button
+    type="button"
     onClick={() => { if (!spUser) spotifyLogin(); }}
     disabled={!!spUser}
     className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-light transition-colors ${
@@ -940,11 +960,12 @@ const handleExportToSpotify = useCallback(async () => {
     {spUser ? "Spotify connected" : "Connect to Spotify"}
   </button>
 
-  {/* Export menu */}
+  {/* Export */}
   <div className="relative" ref={exportMenuRef}>
     <button
-      onClick={() => setExportOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      type="button"
+      onClick={() => setExportOpen(v => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
       disabled={!songs.length}
     >
       <Download size={16} /> Export
@@ -954,20 +975,14 @@ const handleExportToSpotify = useCallback(async () => {
       <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
         <button
           className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportPlaylist();
-            setExportOpen(false);
-          }}
+          onClick={() => { exportPlaylist(); setExportOpen(false); }}
         >
           Export playlist (CSV)
         </button>
 
         <button
-          className="w-full px-3 py-2 text-sm hover:bg-sky-50 disabled:opacity-50 flex items-center justify-between"
-          onClick={() => {
-            requirePro(() => { void handleExportToSpotify(); });
-            setExportOpen(false);
-          }}
+          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
+          onClick={() => { requirePro(() => { void handleExportToSpotify(); }); setExportOpen(false); }}
           disabled={spBusy}
         >
           <span className="text-left">
@@ -983,10 +998,7 @@ const handleExportToSpotify = useCallback(async () => {
 
         <button
           className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportBuckets();
-            setExportOpen(false);
-          }}
+          onClick={() => { exportBuckets(); setExportOpen(false); }}
         >
           Export all buckets (3 CSVs)
         </button>
@@ -995,8 +1007,9 @@ const handleExportToSpotify = useCallback(async () => {
   </div>
 
   <button
+    type="button"
     onClick={resetAll}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors"
   >
     Reset
   </button>
@@ -1005,8 +1018,8 @@ const handleExportToSpotify = useCallback(async () => {
         </div>
 
         <div className="h-0.5 w-full bg-rose-100">
-  <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
-</div>
+          <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
+        </div>
 
         {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
       </header>
@@ -1017,8 +1030,8 @@ const handleExportToSpotify = useCallback(async () => {
             <div className="max-w-xl">
               <h2 className="text-2xl font-semibold mb-2">Import your song list</h2>
               <p className="text-slate-600 mb-6">
-                Accepted formats: CSV or JSONL. Include at least a title field, artist is optional. Duplicate titles and
-                artists will be auto merged.
+                Accepted formats: CSV or JSONL. Include at least a title field, artist is optional. Duplicate titles and artists will be
+                auto merged.
               </p>
               <button
                 className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-pink-200 text-pink-900 hover:bg-pink-300"
@@ -1102,10 +1115,10 @@ const handleExportToSpotify = useCallback(async () => {
                 {/* current card */}
                 <div
                   key={current ? current.__id : "empty"}
-                className={`relative rounded-3xl ${theme.bg} shadow-xl hover:shadow-2xl hover:shadow-rose-100 transition-shadow border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
-  "min-h[420px]",
-  "min-h-[420px]"
-)}
+                  className={`relative rounded-3xl ${theme.bg} shadow-xl hover:shadow-2xl hover:shadow-rose-100 transition-shadow border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
+                    "min-h[420px]",
+                    "min-h-[420px]"
+                  )}
                   style={{
                     transform:
                       fling.active && current && fling.id === current.__id
@@ -1129,13 +1142,13 @@ const handleExportToSpotify = useCallback(async () => {
 
                       {current.__art ? (
                         <img
-  src={toHttps(current.__art)}
-  crossOrigin="anonymous"
-  referrerPolicy="no-referrer"
-  alt={`${current.title} cover`}
-  className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
-  loading="lazy"
-/>
+                          src={toHttps(current.__art)}
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
+                          alt={`${current.title} cover`}
+                          className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
+                          loading="lazy"
+                        />
                       ) : null}
 
                       {current.artist ? <div className="text-lg text-slate-600 mt-2">{current.artist}</div> : null}
@@ -1146,9 +1159,7 @@ const handleExportToSpotify = useCallback(async () => {
                           aria-label="Preview"
                           onClick={togglePreview}
                           disabled={!current || fling.active}
-                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-rose-200 bg-white/90 hover:bg-rose-50 text-sm font-light text-rose-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-
-
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-rose-200 bg-white/90 hover:bg-rose-50 text-sm font-light text-rose-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                         >
                           {previewing ? <Pause size={16} /> : <Play size={16} />}
                           <span>{previewing ? "Stop snippet" : previewPreparing ? "Preparing…" : "Play snippet"}</span>
@@ -1156,7 +1167,9 @@ const handleExportToSpotify = useCallback(async () => {
                       </div>
 
                       <div className="mt-4 flex justify-center gap-3 text-xs text-slate-500">
-                        {current.genre ? <span className="px-3 py-1 rounded-full bg-stone-100/50 text-xs font-light text-stone-500">{current.genre}</span> : null}
+                        {current.genre ? (
+                          <span className="px-3 py-1 rounded-full bg-stone-100/50 text-xs font-light text-stone-500">{current.genre}</span>
+                        ) : null}
                         {current.decade ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.decade}</span> : null}
                         {current.bpm ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.bpm} BPM</span> : null}
                       </div>
@@ -1202,9 +1215,7 @@ const handleExportToSpotify = useCallback(async () => {
                       aria-label="Undo"
                       onClick={onUndo}
                       disabled={fling.active}
-                     className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-
-
+                      className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     >
                       <RotateCcw />
                     </button>
@@ -1213,7 +1224,6 @@ const handleExportToSpotify = useCallback(async () => {
                       onClick={onNo}
                       disabled={fling.active}
                       className="p-4 rounded-full bg-rose-100/50 text-rose-600 hover:bg-rose-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-
                     >
                       <X size={28} />
                     </button>
@@ -1222,7 +1232,6 @@ const handleExportToSpotify = useCallback(async () => {
                       onClick={onYes}
                       disabled={fling.active}
                       className="p-5 rounded-full bg-green-100/60 text-green-700 hover:bg-green-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-
                     >
                       <Check size={30} />
                     </button>
@@ -1238,9 +1247,7 @@ const handleExportToSpotify = useCallback(async () => {
                       aria-label="Skip"
                       onClick={onSkip}
                       disabled={fling.active}
-                     className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-
-
+                      className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     >
                       <SkipForward />
                     </button>
@@ -1253,113 +1260,92 @@ const handleExportToSpotify = useCallback(async () => {
                 </div>
               </div>
             </section>
-{/* Mobile controls under the card */}
-<div className="md:hidden mt-4 flex items-center justify-center gap-2">
-{/* Connect to Spotify (mobile) */}
-<button
-  onClick={spotifyLogin}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60"
-  disabled={!!spUser}
-  title={spUser ? "Spotify connected" : "Connect to Spotify"}
->
-  {spUser ? "Spotify connected" : "Connect Spotify"}
-</button>
 
-  {/* Upload (mobile) */}
-  <div className="relative" ref={mobileUploadMenuRef}>
-    <button
-      onClick={() => setMobileUploadOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-    >
-      <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
-    </button>
+            {/* Mobile controls under the card (NO Spotify connect button) */}
+            <div className="md:hidden mt-4 flex items-center justify-center gap-2">
+              {/* Upload (mobile) */}
+              <div className="relative" ref={mobileUploadMenuRef}>
+                <button
+                  onClick={() => setMobileUploadOpen((v) => !v)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                >
+                  <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
+                </button>
 
-    {mobileUploadOpen && (
-      <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={triggerUploadAddMobile}
-        >
-          Add to existing songs <span className="text-rose-700/70">(Pro)</span>
-        </button>
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={triggerUploadReplaceMobile}
-        >
-          Replace songs <span className="text-rose-700/70">(Pro)</span>
-        </button>
-      </div>
-    )}
-  </div>
-{!spUser && (
-  <button
-    onClick={spotifyLogin}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors"
-  >
-    Connect to Spotify
-  </button>
-)}
+                {mobileUploadOpen && (
+                  <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAddMobile}>
+                      Add to existing songs <span className="text-rose-700/70">(Pro)</span>
+                    </button>
+                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplaceMobile}>
+                      Replace songs <span className="text-rose-700/70">(Pro)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
-  {/* Export (mobile) */}
-  <div className="relative" ref={mobileExportMenuRef}>
-    <button
-      onClick={() => setMobileExportOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-      disabled={!songs.length}
-    >
-      <Download size={16} /> Export
-    </button>
+              {/* Export (mobile) */}
+              <div className="relative" ref={mobileExportMenuRef}>
+                <button
+                  onClick={() => setMobileExportOpen((v) => !v)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  disabled={!songs.length}
+                >
+                  <Download size={16} /> Export
+                </button>
 
-    {mobileExportOpen && (
-      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => { exportPlaylist(); setMobileExportOpen(false); }}
-        >
-          Export playlist (CSV)
-        </button>
+                {mobileExportOpen && (
+                  <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                      onClick={() => {
+                        exportPlaylist();
+                        setMobileExportOpen(false);
+                      }}
+                    >
+                      Export playlist (CSV)
+                    </button>
 
-        <button
-          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-          onClick={() => { requirePro(() => { void handleExportToSpotify(); }); setMobileExportOpen(false); }}
-          disabled={spBusy}
-        >
-          <span className="text-left">
-            Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
-          </span>
-          <span className="ml-2 inline-flex items-center gap-1 text-xs">
-            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
-              {spUser ? "connected" : "not connected"}
-            </span>
-          </span>
-        </button>
+                    <button
+                      className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
+                      onClick={() => {
+                        requirePro(() => {
+                          void handleExportToSpotify();
+                        });
+                        setMobileExportOpen(false);
+                      }}
+                      disabled={spBusy}
+                    >
+                      <span className="text-left">
+                        Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
+                      </span>
+                      <span className="ml-2 inline-flex items-center gap-1 text-xs">
+                        <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
+                        <span className={spUser ? "text-emerald-700" : "text-slate-500"}>{spUser ? "connected" : "not connected"}</span>
+                      </span>
+                    </button>
 
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => { exportBuckets(); setMobileExportOpen(false); }}
-        >
-          Export all buckets (3 CSVs)
-        </button>
-      </div>
-    )}
-  </div>
-<button
-  onClick={spotifyLogin}
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-  disabled={!!spUser}
->
-  {spUser ? "Spotify connected" : "Connect Spotify"}
-</button>
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+                      onClick={() => {
+                        exportBuckets();
+                        setMobileExportOpen(false);
+                      }}
+                    >
+                      Export all buckets (3 CSVs)
+                    </button>
+                  </div>
+                )}
+              </div>
 
-  {/* Reset (mobile) */}
-  <button
-    onClick={resetAll}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-  >
-    Reset
-  </button>
-</div>
+              {/* Reset (mobile) */}
+              <button
+                onClick={resetAll}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              >
+                Reset
+              </button>
+            </div>
 
             {/* sidebar under the card (stacked layout) */}
             <aside className="space-y-4">
@@ -1389,9 +1375,7 @@ const handleExportToSpotify = useCallback(async () => {
         )}
       </main>
 
-      <footer className="py-6 text-center text-xs text-slate-500">
-        Made for choosing bangers, not ballads only. Choose responsibly.
-      </footer>
+      <footer className="py-6 text-center text-xs text-slate-500">Made for choosing bangers, not ballads only. Choose responsibly.</footer>
 
       {coffeeOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
@@ -1438,13 +1422,9 @@ const handleExportToSpotify = useCallback(async () => {
               <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
                 Not now
               </button>
-              <button
-  onClick={startCheckout}
-  className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500"
->
-  Continue to checkout
-</button>
-
+              <button onClick={startCheckout} className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500">
+                Continue to checkout
+              </button>
             </div>
           </div>
         </div>
@@ -1463,14 +1443,11 @@ const handleExportToSpotify = useCallback(async () => {
 function Panel({ title, children }) {
   return (
     <div className="rounded-xl bg-white border border-rose-200 shadow-none">
-      <div className="px-5 py-3 border-b border-rose-100 bg-rose-50/60 text-rose-800 font-medium rounded-t-xl">
-        {title}
-      </div>
+      <div className="px-5 py-3 border-b border-rose-100 bg-rose-50/60 text-rose-800 font-medium rounded-t-xl">{title}</div>
       <div className="p-4">{children}</div>
     </div>
   );
 }
-
 
 function Stat({ label, value }) {
   return (
@@ -1480,7 +1457,6 @@ function Stat({ label, value }) {
     </div>
   );
 }
-
 
 function PeekList({ title, items }) {
   const MAX = 6;
@@ -1497,11 +1473,7 @@ function PeekList({ title, items }) {
           </div>
         ))}
 
-        {items.length > MAX ? (
-          <div className="text-xs text-slate-400">
-            {`+ ${items.length - MAX} more`}
-          </div>
-        ) : null}
+        {items.length > MAX ? <div className="text-xs text-slate-400">{`+ ${items.length - MAX} more`}</div> : null}
       </div>
     </div>
   );
