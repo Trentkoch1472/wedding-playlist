@@ -225,15 +225,6 @@ export default function App() {
     document.title = "Swipe to Dance";
   }, []);
 
-  // Normalize URL so everything lives under /wedding-playlist
-  useEffect(() => {
-    const { pathname, search, hash } = window.location;
-    if (!pathname.startsWith(BASE_PATH)) {
-      const next = BASE_PATH + (pathname === "/" ? "" : pathname) + search + hash;
-      window.history.replaceState({}, document.title, next);
-    }
-  }, []);
-
 // One redirect per environment: localhost root in dev, custom domain root in prod
 const SPOTIFY_REDIRECT_URI = (() => {
   const { hostname, protocol, port } = window.location;
