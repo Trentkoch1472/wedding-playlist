@@ -234,22 +234,17 @@ export default function App() {
     }
   }, []);
 
-// Update the redirect URI logic to remove the path:
+// One redirect per environment: localhost root in dev, custom domain root in prod
 const SPOTIFY_REDIRECT_URI = (() => {
   const { hostname, protocol, port } = window.location;
-  
-  // If on localhost, keep the path for development
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `${protocol}//${hostname}${port ? ':' + port : ''}/wedding-playlist`;
+
+  // Local dev: root (no path)
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
   }
-  
-  // If on custom domain, no path needed
-  if (hostname === 'swipetodance.trentkoch.com') {
-    return 'https://swipetodance.trentkoch.com';
-  }
-  
-  // GitHub Pages URL
-  return 'https://trentkoch1472.github.io/wedding-playlist';
+
+  // Deployed: custom domain root (no path)
+  return "https://swipetodance.trentkoch.com";
 })();
 
 // Keep your existing auto-start login useEffect as-is
