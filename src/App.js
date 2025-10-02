@@ -213,13 +213,30 @@ useEffect(() => {
     document.title = "Swipe to Dance";
   }, []);
 
-  // --- Spotify redirect: use the exact current page URL (no trailing slash) ---
-  const SPOTIFY_REDIRECT_URI = (() => {
-    const u = new URL(window.location.href);
-    const exact = u.origin + u.pathname.replace(/\/$/, ""); // strip trailing slash
-    console.log("Using Spotify redirect:", exact);
-    return exact;
-  })();
+
+
+ // ----- ONE base path + fixed redirect URIs + API base -----
+const BASE_PATH = "/wedding-playlist";
+
+// Normalize URL so everything lives under /wedding-playlist
+useEffect(() => {
+  const { pathname, search, hash } = window.location;
+  if (!pathname.startsWith(BASE_PATH)) {
+    const next = BASE_PATH + (pathname === "/" ? "" : pathname) + search + hash;
+    window.history.replaceState({}, document.title, next);
+  }
+}, []);
+
+const SPOTIFY_REDIRECT_URI =
+  window.location.hostname === "swipetodance.trentkoch.com"
+    ? "https://swipetodance.trentkoch.com/wedding-playlist"
+    : "https://trentkoch1472.github.io/wedding-playlist";
+
+const API_BASE_URL =
+  /swipetodance\.trentkoch\.com|vercel\.app$/i.test(window.location.hostname)
+    ? ""
+    : "https://wedding-playlist-zeta.vercel.app";
+
 
   const {
     user: spUser,
@@ -298,6 +315,23 @@ useEffect(() => {
     setPayOpen(false);
   }, []);
 
+const startCheckout = useCallback(async () => {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/create-checkout-session`, { method: "POST" });
+    const j = await r.json();
+    if (j?.url) {
+      // close modal and go to Stripe
+      setPayOpen(false);
+      window.location.assign(j.url);
+    } else {
+      alert("Couldn't start checkout.");
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Checkout error.");
+  }
+}, [setPayOpen]);
+
 // Theme for cards
 const themes = [
   { bg: "bg-rose-50", border: "border-rose-200" },
@@ -329,6 +363,34 @@ const themeNext = themes[(index + 1) % 2];
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+// Verify Stripe session on return
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const sid = params.get("session_id");
+  if (!sid) return;
+
+  (async () => {
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/verify-session?session_id=${sid}`);
+      const j = await r.json();
+      if (j.ok) {
+        setProUnlocked(true);
+        showToast("Pro unlocked — thanks!");
+      } else {
+        showToast("Payment not verified. Try again.");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Verification error.");
+    } finally {
+      params.delete("session_id");
+      const qs = params.toString();
+      const clean = window.location.pathname + (qs ? `?${qs}` : "");
+      window.history.replaceState({}, document.title, clean);
+    }
+  })();
+}, [showToast, setProUnlocked]);
 
   // Derived lists
   const yesList = useMemo(
@@ -775,18 +837,18 @@ const tryPlay = async (audio) => {
     maybeOfferCoffee(); // show donation prompt (once per browser)
   };
 
-  const handleExportToSpotify = useCallback(async () => {
-    if (!starList.length && !yesList.length) {
-      alert("No songs to export yet. Approve or star some songs first.");
-      return;
-    }
-    if (!spUser) {
-      spotifyLogin();
-      return;
-    }
-    const url = await exportToSpotify(starList, yesList);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
-  }, [spUser, spotifyLogin, exportToSpotify, starList, yesList]);
+const handleExportToSpotify = useCallback(async () => {
+  if (!starList.length && !yesList.length) {
+    alert("No songs to export yet. Approve or star some songs first.");
+    return;
+  }
+  if (!spUser) {
+    alert("Please connect to Spotify first (use the Connect button).");
+    return;
+  }
+  const url = await exportToSpotify(starList, yesList);
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
+}, [spUser, exportToSpotify, starList, yesList]);
 
   // 2) Buckets export (3 CSVs)
   const exportBuckets = () => {
@@ -858,13 +920,25 @@ const tryPlay = async (audio) => {
               )}
             </div>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.json,.jsonl,.ndjson"
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
-            />
+           {/* Connect to Spotify (desktop) */}
+<button
+  onClick={spotifyLogin}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60"
+  disabled={!!spUser}
+  title={spUser ? "Spotify connected" : "Connect to Spotify"}
+>
+  {spUser ? "Spotify connected" : "Connect to Spotify"}
+</button>
+
+{!spUser && (
+  <button
+  onClick={spotifyLogin}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-light hover:bg-emerald-200 transition-colors"
+>
+  Connect to Spotify
+</button>
+
+)}
 
             <div className="relative" ref={exportMenuRef}>
             <button
@@ -874,7 +948,13 @@ const tryPlay = async (audio) => {
 >
   <Download size={16} /> Export
 </button>
-
+<button
+  onClick={spotifyLogin}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+  disabled={!!spUser}  // already connected? disable
+>
+  {spUser ? "Spotify connected" : "Connect Spotify"}
+</button>
 
               {exportOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
@@ -1183,6 +1263,16 @@ const tryPlay = async (audio) => {
             </section>
 {/* Mobile controls under the card */}
 <div className="md:hidden mt-4 flex items-center justify-center gap-2">
+{/* Connect to Spotify (mobile) */}
+<button
+  onClick={spotifyLogin}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60"
+  disabled={!!spUser}
+  title={spUser ? "Spotify connected" : "Connect to Spotify"}
+>
+  {spUser ? "Spotify connected" : "Connect Spotify"}
+</button>
+
   {/* Upload (mobile) */}
   <div className="relative" ref={mobileUploadMenuRef}>
     <button
@@ -1209,6 +1299,14 @@ const tryPlay = async (audio) => {
       </div>
     )}
   </div>
+{!spUser && (
+  <button
+    onClick={spotifyLogin}
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-light hover:bg-emerald-500 transition-colors"
+  >
+    Connect to Spotify
+  </button>
+)}
 
   {/* Export (mobile) */}
   <div className="relative" ref={mobileExportMenuRef}>
@@ -1254,6 +1352,13 @@ const tryPlay = async (audio) => {
       </div>
     )}
   </div>
+<button
+  onClick={spotifyLogin}
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+  disabled={!!spUser}
+>
+  {spUser ? "Spotify connected" : "Connect Spotify"}
+</button>
 
   {/* Reset (mobile) */}
   <button
@@ -1341,9 +1446,13 @@ const tryPlay = async (audio) => {
               <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
                 Not now
               </button>
-              <button onClick={unlockPro} className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500">
-                Unlock Pro
-              </button>
+              <button
+  onClick={startCheckout}
+  className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500"
+>
+  Continue to checkout
+</button>
+
             </div>
           </div>
         </div>

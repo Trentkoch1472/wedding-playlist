@@ -3,6 +3,37 @@ import { useCallback, useEffect, useState } from "react";
 
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const API_BASE = "https://api.spotify.com/v1";
+const TOKEN_PROXY = (() => {
+  const h = window.location.hostname;
+  // Local dev: hit the local serverless endpoint via the dev server
+  if (h === "localhost" || h === "127.0.0.1") return "/api/spotify-token";
+  // Deployed (GitHub Pages / custom domain): call the Vercel function by absolute URL
+  return "https://wedding-playlist-zeta.vercel.app/api/spotify-token";
+})();
+
+// Storage keys
+const LS_TOKEN = "sp_token_v2";            // { accessToken, refreshToken, expAt }
+const SS_CODE_VERIFIER = "sp_code_verifier";
+const SS_AUTH_STATE   = "sp_auth_state";
+
+// ---------- PKCE helpers ----------
+function b64urlFromBuffer(buf) {
+  let str = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  return str.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function randUrlSafe(len = 64) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  let out = "";
+  for (let i = 0; i < len; i++) out += chars[arr[i] % chars.length];
+  return out;
+}
+async function codeChallengeS256(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return b64urlFromBuffer(digest);
+}
 
 export default function useSpotify({
   clientId,
@@ -10,44 +41,138 @@ export default function useSpotify({
   scopes = ["playlist-modify-public", "playlist-modify-private"],
 }) {
   const [token, setToken] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(null);
   const [user, setUser] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Parse token from hash (Implicit Grant)
+  // 1) Handle callback (?code=...) AND restore from localStorage if already signed in
   useEffect(() => {
-    const hash = window.location.hash.startsWith("#")
-      ? window.location.hash.slice(1)
-      : "";
-    const params = new URLSearchParams(hash);
-    const accessToken = params.get("access_token");
-    const expiresIn = params.get("expires_in");
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const returnedState = url.searchParams.get("state");
+    const error = url.searchParams.get("error");
 
-    if (accessToken) {
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-      setToken(accessToken);
-      try {
-        const expAt = Date.now() + (parseInt(expiresIn || "3600", 10) * 1000);
-        localStorage.setItem("sp_token", JSON.stringify({ accessToken, expAt }));
-      } catch {}
+    if (error) {
+      setMsg(`Spotify auth error: ${error}`);
+      // strip params so user can retry
+      url.searchParams.delete("error");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
       return;
     }
 
-    // Restore from storage
-    try {
-      const raw = localStorage.getItem("sp_token");
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved?.accessToken && saved?.expAt > Date.now()) {
-          setToken(saved.accessToken);
-        } else {
-          localStorage.removeItem("sp_token");
+    // If we returned from Spotify with a code, exchange it
+    if (code) {
+      const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || "";
+      if (!returnedState || returnedState !== expectedState) {
+        setMsg("Spotify login aborted (state mismatch).");
+        // clean URL
+        url.searchParams.delete("code");
+        url.searchParams.delete("state");
+        window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+        return;
+      }
+
+      const verifier = sessionStorage.getItem(SS_CODE_VERIFIER);
+      if (!verifier) {
+        setMsg("Missing PKCE verifier; please connect again.");
+        return;
+      }
+
+      (async () => {
+        try {
+          const body = new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: redirectUri,
+            client_id: clientId,
+            code_verifier: verifier,
+          });
+
+          const r = await fetch(TOKEN_PROXY, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body,
+          });
+          const js = await r.json();
+          if (!r.ok || !js.access_token) {
+            throw new Error(js.error_description || "Token exchange failed");
+          }
+
+          const accessToken = js.access_token;
+          const expiresIn = js.expires_in || 3600;
+          const refreshTok = js.refresh_token || null;
+          const expAt = Date.now() + expiresIn * 1000 - 60_000; // refresh a minute early
+
+          setToken(accessToken);
+          setRefreshToken(refreshTok);
+          try {
+            localStorage.setItem(
+              LS_TOKEN,
+              JSON.stringify({ accessToken, refreshToken: refreshTok, expAt })
+            );
+          } catch {}
+
+          // Clean up one-time items + query params
+          sessionStorage.removeItem(SS_CODE_VERIFIER);
+          sessionStorage.removeItem(SS_AUTH_STATE);
+          url.searchParams.delete("code");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+          setMsg("");
+        } catch (e) {
+          console.error(e);
+          setMsg("Spotify sign-in failed.");
         }
+      })();
+
+      return; // don't also run restore on this render
+    }
+
+    // No auth code in URL: attempt restore, and refresh if expired
+    try {
+      const raw = localStorage.getItem(LS_TOKEN);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.accessToken && saved?.expAt > Date.now()) {
+        setToken(saved.accessToken);
+        setRefreshToken(saved.refreshToken || null);
+      } else if (saved?.refreshToken) {
+        // attempt a silent refresh
+        (async () => {
+          try {
+            const body = new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: saved.refreshToken,
+              client_id: clientId,
+            });
+            const r = await fetch(TOKEN_PROXY, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body,
+            });
+            const js = await r.json();
+            if (!r.ok || !js.access_token) throw new Error("Refresh failed");
+            const accessToken = js.access_token;
+            const newRefresh = js.refresh_token || saved.refreshToken;
+            const expAt = Date.now() + (js.expires_in || 3600) * 1000 - 60_000;
+            setToken(accessToken);
+            setRefreshToken(newRefresh);
+            localStorage.setItem(
+              LS_TOKEN,
+              JSON.stringify({ accessToken, refreshToken: newRefresh, expAt })
+            );
+            setMsg("");
+          } catch {
+            localStorage.removeItem(LS_TOKEN);
+          }
+        })();
       }
     } catch {}
-  }, []);
+  }, [clientId, redirectUri]);
 
-  // Load profile
+  // 2) Load profile when we have a token
   useEffect(() => {
     if (!token) return;
     (async () => {
@@ -57,27 +182,74 @@ export default function useSpotify({
         });
         if (!r.ok) throw new Error(`Profile ${r.status}`);
         setUser(await r.json());
+        setMsg("");
       } catch (e) {
         console.error(e);
-        setMsg("Spotify auth expired. Please sign in again.");
+        setMsg("Spotify auth expired. Please connect again.");
         setToken(null);
-        localStorage.removeItem("sp_token");
+        setRefreshToken(null);
+        localStorage.removeItem(LS_TOKEN);
       }
     })();
   }, [token]);
 
-  const login = useCallback(() => {
+  // 3) Start login (PKCE)
+  const login = useCallback(async () => {
+    const verifier = randUrlSafe(64);
+    const challenge = await codeChallengeS256(verifier);
+    const state = randUrlSafe(16);
+
+    // use sessionStorage so multiple tabs don't collide
+    sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
+    sessionStorage.setItem(SS_AUTH_STATE, state);
+
     const url = new URL(AUTH_URL);
     url.searchParams.set("client_id", clientId);
-    url.searchParams.set("response_type", "token");
+    url.searchParams.set("response_type", "code");
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("scope", scopes.join(" "));
+    url.searchParams.set("state", state);
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("show_dialog", "true");
-    console.log("Spotify AUTH URL:", url.toString());
+
     window.location.assign(url.toString());
   }, [clientId, redirectUri, scopes]);
 
-  // 🔎 NEW: find art/preview via Spotify as a fallback (requires user to be logged in)
+  // 4) Optional refresh-on-demand
+  const refresh = useCallback(async () => {
+    if (!refreshToken) return false;
+    try {
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+      });
+      const r = await fetch(TOKEN_PROXY, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      const js = await r.json();
+      if (!r.ok || !js.access_token) return false;
+
+      const accessToken = js.access_token;
+      const newRefresh = js.refresh_token || refreshToken;
+      const expAt = Date.now() + (js.expires_in || 3600) * 1000 - 60_000;
+
+      setToken(accessToken);
+      setRefreshToken(newRefresh);
+      localStorage.setItem(
+        LS_TOKEN,
+        JSON.stringify({ accessToken, refreshToken: newRefresh, expAt })
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }, [clientId, refreshToken]);
+
+  // 5) Fallback metadata search (unchanged API)
   const findTrackMeta = useCallback(
     async (title, artist) => {
       if (!token) return null;
@@ -91,9 +263,10 @@ export default function useSpotify({
         const js = await r.json();
         const t = js.tracks?.items?.[0];
         if (!t) return null;
-        const preview = t.preview_url || null;              // https
-        const art = t.album?.images?.[0]?.url || null;      // https
-        return { preview, art };
+        return {
+          preview: t.preview_url || null,
+          art: t.album?.images?.[0]?.url || null,
+        };
       } catch {
         return null;
       }
@@ -101,16 +274,28 @@ export default function useSpotify({
     [token]
   );
 
+  // 6) Export playlist (unchanged behavior)
   const exportToSpotify = useCallback(
     async (stars, yeses) => {
-      if (!token || !user) { setMsg("Sign in to Spotify first."); return null; }
-      setBusy(true); setMsg("Creating playlist…");
+      if (!token || !user) {
+        setMsg("Connect to Spotify first.");
+        return null;
+      }
+      setBusy(true);
+      setMsg("Creating playlist…");
       try {
         const name = "Swipe to Dance";
         const createRes = await fetch(`${API_BASE}/users/${user.id}/playlists`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description: "Generated by Swipe to Dance", public: false })
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            description: "Generated by Swipe to Dance",
+            public: false,
+          }),
         });
         if (!createRes.ok) throw new Error(`Create playlist ${createRes.status}`);
         const playlist = await createRes.json();
@@ -119,9 +304,10 @@ export default function useSpotify({
         const uris = [];
         for (const s of wanted) {
           const q = [s.title, s.artist].filter(Boolean).join(" ");
-          const sr = await fetch(`${API_BASE}/search?type=track&limit=1&q=${encodeURIComponent(q)}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          const sr = await fetch(
+            `${API_BASE}/search?type=track&limit=1&q=${encodeURIComponent(q)}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
           if (!sr.ok) continue;
           const js = await sr.json();
           const t = js.tracks?.items?.[0];
@@ -132,8 +318,11 @@ export default function useSpotify({
           const chunk = uris.slice(i, i + 100);
           await fetch(`${API_BASE}/playlists/${playlist.id}/tracks`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ uris: chunk })
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ uris: chunk }),
           });
         }
 
@@ -141,13 +330,17 @@ export default function useSpotify({
         return playlist.external_urls?.spotify || null;
       } catch (e) {
         console.error(e);
+        // If unauthorized, try one refresh then bail
+        if ((e?.status === 401 || e?.message?.includes("401")) && (await refresh())) {
+          return null;
+        }
         setMsg("Spotify export failed.");
         return null;
       } finally {
         setBusy(false);
       }
     },
-    [token, user]
+    [token, user, refresh]
   );
 
   return { user, busy, msg, login, exportToSpotify, findTrackMeta };
