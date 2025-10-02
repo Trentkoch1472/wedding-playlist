@@ -4,19 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const API_BASE = "https://api.spotify.com/v1";
 
-// Token proxy selection:
-// - Local dev via `vercel dev`: relative "/api/spotify-token" works
-// - Anywhere else (GitHub Pages / custom domain): use absolute Vercel URL
-const TOKEN_PROXY = (() => {
-  const h = window.location.hostname;
-  // Always use the Vercel endpoint directly to avoid CORS issues
-  return "https://wedding-playlist-zeta.vercel.app/api/spotify-token";
-})();
+// Always hit your Vercel function (works from GH Pages/custom domain/local dev)
+const TOKEN_PROXY = "https://wedding-playlist-zeta.vercel.app/api/spotify-token";
 
 // Storage keys
-const LS_TOKEN = "sp_token_v2";            // { accessToken, refreshToken, expAt }
+const LS_TOKEN = "sp_token_v2";                 // { accessToken, refreshToken, expAt }
 const SS_CODE_VERIFIER = "sp_code_verifier";
 const SS_AUTH_STATE   = "sp_auth_state";
+const SS_REDIRECT_URI = "sp_redirect_uri";
 
 // ---------- PKCE helpers ----------
 function b64urlFromBuffer(buf) {
@@ -32,10 +27,6 @@ function randUrlSafe(len = 64) {
   return out;
 }
 async function codeChallengeS256(verifier) {
-  if (!window.isSecureContext || !crypto?.subtle) {
-    // PKCE requires a secure context (https or localhost)
-    throw new Error("SecureContextRequired");
-  }
   const data = new TextEncoder().encode(verifier);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return b64urlFromBuffer(digest);
@@ -52,111 +43,91 @@ export default function useSpotify({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
- // 1) Handle callback (?code=...) AND restore from localStorage if already signed in
-useEffect(() => {
-  const url = new URL(window.location.href);
-  const code = url.searchParams.get("code");
-  const returnedState = url.searchParams.get("state");
-  const error = url.searchParams.get("error");
+  // 1) Handle callback (?code=...) AND restore from localStorage if already signed in
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const returnedState = url.searchParams.get("state");
+    const error = url.searchParams.get("error");
 
-  console.log("Spotify callback check:", { code: !!code, returnedState, error });
-
-  if (error) {
-    console.error("Spotify auth error:", error);
-    setMsg(`Spotify auth error: ${error}`);
-    // strip params so user can retry
-    url.searchParams.delete("error");
-    url.searchParams.delete("state");
-    window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
-    return;
-  }
-
-  // If we returned from Spotify with a code, exchange it
-  if (code) {
-    const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || "";
-    console.log("State comparison:", { expectedState, returnedState, match: expectedState === returnedState });
-    
-    if (!returnedState || returnedState !== expectedState) {
-      setMsg("Spotify login aborted (state mismatch).");
-      // clean URL
-      url.searchParams.delete("code");
+    if (error) {
+      setMsg(`Spotify auth error: ${error}`);
+      url.searchParams.delete("error");
       url.searchParams.delete("state");
       window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
       return;
     }
 
-    const verifier = sessionStorage.getItem(SS_CODE_VERIFIER);
-    console.log("Starting token exchange with verifier:", !!verifier);
-    
-    if (!verifier) {
-      setMsg("Missing PKCE verifier; please connect again.");
-      return;
-    }
-
-    (async () => {
-      try {
-      const lockedRedirect = sessionStorage.getItem("sp_redirect_uri") || redirectUri;
-
-const body = new URLSearchParams({
-  grant_type: "authorization_code",
-  code,
-  redirect_uri: lockedRedirect,      // use the locked value
-  client_id: clientId,
-  code_verifier: verifier,
-});
-
-        console.log("Token exchange URL:", TOKEN_PROXY);
-        console.log("Token exchange redirect_uri:", redirectUri);
-
-        const r = await fetch(TOKEN_PROXY, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
-        });
-        
-        console.log("Token exchange response status:", r.status);
-        const js = await r.json();
-        console.log("Token exchange result:", { success: !!js.access_token, error: js.error });
-        
-        if (!r.ok || !js.access_token) {
-          throw new Error(js.error_description || js.error || "Token exchange failed");
-        }
-
-        const accessToken = js.access_token;
-        const expiresIn = js.expires_in || 3600;
-        const refreshTok = js.refresh_token || null;
-        const expAt = Date.now() + expiresIn * 1000 - 60_000; // refresh a minute early
-
-        setToken(accessToken);
-        setRefreshToken(refreshTok);
-        try {
-          localStorage.setItem(
-            LS_TOKEN,
-            JSON.stringify({ accessToken, refreshToken: refreshTok, expAt })
-          );
-        } catch {}
-
-        // Clean up one-time items + query params
-      sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
-sessionStorage.setItem(SS_AUTH_STATE, state);
-sessionStorage.setItem("sp_redirect_uri", redirectUri); // <-- keep the exact redirect for token exchange
+    // If we returned from Spotify with a code, exchange it
+    if (code) {
+      const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || "";
+      if (!returnedState || returnedState !== expectedState) {
+        setMsg("Spotify login aborted (state mismatch).");
         url.searchParams.delete("code");
         url.searchParams.delete("state");
         window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
-        setMsg("");
-        console.log("Token saved successfully!");
-      } catch (e) {
-        console.error("Token exchange error:", e);
-        if (e.message === "SecureContextRequired") {
-          setMsg("Spotify sign-in requires HTTPS or localhost. Use the approved dev URL.");
-        } else {
-          setMsg(`Spotify sign-in failed: ${e.message}`);
-        }
+        return;
       }
-    })();
 
-    return; // don't also run restore on this render
-  }
+      const verifier = sessionStorage.getItem(SS_CODE_VERIFIER);
+      if (!verifier) {
+        setMsg("Missing PKCE verifier; please connect again.");
+        return;
+      }
+
+      (async () => {
+        try {
+          // Use the same redirect URI that initiated login
+          const lockedRedirect = sessionStorage.getItem(SS_REDIRECT_URI) || redirectUri;
+
+          const body = new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: lockedRedirect,
+            client_id: clientId,
+            code_verifier: verifier,
+          });
+
+          const r = await fetch(TOKEN_PROXY, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body,
+          });
+          const js = await r.json();
+          if (!r.ok || !js.access_token) {
+            throw new Error(js.error_description || "token proxy failed");
+          }
+
+          const accessToken = js.access_token;
+          const expiresIn = js.expires_in || 3600;
+          const refreshTok = js.refresh_token || null;
+          const expAt = Date.now() + expiresIn * 1000 - 60_000; // refresh a minute early
+
+          setToken(accessToken);
+          setRefreshToken(refreshTok);
+          try {
+            localStorage.setItem(
+              LS_TOKEN,
+              JSON.stringify({ accessToken, refreshToken: refreshTok, expAt })
+            );
+          } catch {}
+
+          // Clean up one-time items + query params
+          sessionStorage.removeItem(SS_CODE_VERIFIER);
+          sessionStorage.removeItem(SS_AUTH_STATE);
+          sessionStorage.removeItem(SS_REDIRECT_URI);
+          url.searchParams.delete("code");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+          setMsg("");
+        } catch (e) {
+          console.error(e);
+          setMsg("Spotify sign-in failed.");
+        }
+      })();
+
+      return; // don't also run restore on this render
+    }
 
     // No auth code in URL: attempt restore, and refresh if expired
     try {
@@ -167,7 +138,6 @@ sessionStorage.setItem("sp_redirect_uri", redirectUri); // <-- keep the exact re
         setToken(saved.accessToken);
         setRefreshToken(saved.refreshToken || null);
       } else if (saved?.refreshToken) {
-        // attempt a silent refresh
         (async () => {
           try {
             const body = new URLSearchParams({
@@ -221,30 +191,29 @@ sessionStorage.setItem("sp_redirect_uri", redirectUri); // <-- keep the exact re
     })();
   }, [token]);
 
- // 3) Start login (PKCE)
-const login = useCallback(async () => {
-  const verifier = randUrlSafe(64);
-  const challenge = await codeChallengeS256(verifier);
-  const state = randUrlSafe(16);
+  // 3) Start login (PKCE)
+  const login = useCallback(async () => {
+    const verifier = randUrlSafe(64);
+    const challenge = await codeChallengeS256(verifier);
+    const authState = randUrlSafe(16);
 
-  sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
-  sessionStorage.setItem(SS_AUTH_STATE, state);
+    // use sessionStorage so multiple tabs don't collide
+    sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
+    sessionStorage.setItem(SS_AUTH_STATE, authState);
+    sessionStorage.setItem(SS_REDIRECT_URI, redirectUri);
 
-  // NEW: lock the redirect we’ll use for the token exchange
-  sessionStorage.setItem("sp_redirect_uri", redirectUri);
+    const url = new URL(AUTH_URL);
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("scope", scopes.join(" "));
+    url.searchParams.set("state", authState);
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("code_challenge", challenge);
+    url.searchParams.set("show_dialog", "true");
 
-  const url = new URL(AUTH_URL);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("scope", scopes.join(" "));
-  url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge_method", "S256");
-  url.searchParams.set("code_challenge", challenge);
-  url.searchParams.set("show_dialog", "true");
-
-  window.location.assign(url.toString());
-}, [clientId, redirectUri, scopes]);
+    window.location.assign(url.toString());
+  }, [clientId, redirectUri, scopes]);
 
   // 4) Optional refresh-on-demand
   const refresh = useCallback(async () => {
@@ -360,7 +329,6 @@ const login = useCallback(async () => {
         return playlist.external_urls?.spotify || null;
       } catch (e) {
         console.error(e);
-        // If unauthorized, try one refresh then bail
         if ((e?.status === 401 || e?.message?.includes("401")) && (await refresh())) {
           return null;
         }
