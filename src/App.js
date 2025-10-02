@@ -225,17 +225,22 @@ export default function App() {
     document.title = "Swipe to Dance";
   }, []);
 
-// One redirect per environment: localhost root in dev, custom domain root in prod
+// Always send a redirect URI that actually exists
 const SPOTIFY_REDIRECT_URI = (() => {
-  const { hostname, protocol, port } = window.location;
+  const h = window.location.hostname;
 
-  // Local dev: root (no path)
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
+  // For local dev, use the GitHub Pages https URL so Spotify accepts it
+  if (h === "localhost" || h === "127.0.0.1") {
+    return "https://trentkoch1472.github.io/wedding-playlist";
   }
 
-  // Deployed: custom domain root (no path)
-  return "https://swipetodance.trentkoch.com";
+  // Custom domain (production) — NO path
+  if (h === "swipetodance.trentkoch.com") {
+    return "https://swipetodance.trentkoch.com";
+  }
+
+  // Default to the GH Pages URL (also in your Spotify allow-list)
+  return "https://trentkoch1472.github.io/wedding-playlist";
 })();
 
 // Keep your existing auto-start login useEffect as-is

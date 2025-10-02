@@ -95,13 +95,15 @@ useEffect(() => {
 
     (async () => {
       try {
-        const body = new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: redirectUri,
-          client_id: clientId,
-          code_verifier: verifier,
-        });
+      const lockedRedirect = sessionStorage.getItem("sp_redirect_uri") || redirectUri;
+
+const body = new URLSearchParams({
+  grant_type: "authorization_code",
+  code,
+  redirect_uri: lockedRedirect,      // use the locked value
+  client_id: clientId,
+  code_verifier: verifier,
+});
 
         console.log("Token exchange URL:", TOKEN_PROXY);
         console.log("Token exchange redirect_uri:", redirectUri);
@@ -135,8 +137,9 @@ useEffect(() => {
         } catch {}
 
         // Clean up one-time items + query params
-        sessionStorage.removeItem(SS_CODE_VERIFIER);
-        sessionStorage.removeItem(SS_AUTH_STATE);
+      sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
+sessionStorage.setItem(SS_AUTH_STATE, state);
+sessionStorage.setItem("sp_redirect_uri", redirectUri); // <-- keep the exact redirect for token exchange
         url.searchParams.delete("code");
         url.searchParams.delete("state");
         window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
@@ -218,36 +221,30 @@ useEffect(() => {
     })();
   }, [token]);
 
-  // 3) Start login (PKCE)
-  const login = useCallback(async () => {
-    try {
-      const verifier = randUrlSafe(64);
-      const challenge = await codeChallengeS256(verifier); // throws if not secure context
-      const state = randUrlSafe(16);
+ // 3) Start login (PKCE)
+const login = useCallback(async () => {
+  const verifier = randUrlSafe(64);
+  const challenge = await codeChallengeS256(verifier);
+  const state = randUrlSafe(16);
 
-      // use sessionStorage so multiple tabs don't collide
-      sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
-      sessionStorage.setItem(SS_AUTH_STATE, state);
+  sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
+  sessionStorage.setItem(SS_AUTH_STATE, state);
 
-      const url = new URL(AUTH_URL);
-      url.searchParams.set("client_id", clientId);
-      url.searchParams.set("response_type", "code");
-      url.searchParams.set("redirect_uri", redirectUri);
-      url.searchParams.set("scope", scopes.join(" "));
-      url.searchParams.set("state", state);
-      url.searchParams.set("code_challenge_method", "S256");
-      url.searchParams.set("code_challenge", challenge);
-      url.searchParams.set("show_dialog", "true");
+  // NEW: lock the redirect we’ll use for the token exchange
+  sessionStorage.setItem("sp_redirect_uri", redirectUri);
 
-      window.location.assign(url.toString());
-    } catch (e) {
-      if (e.message === "SecureContextRequired") {
-        setMsg("Spotify sign-in requires HTTPS or localhost. Use the approved dev URL.");
-      } else {
-        setMsg("Couldn't start Spotify sign-in.");
-      }
-    }
-  }, [clientId, redirectUri, scopes]);
+  const url = new URL(AUTH_URL);
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", scopes.join(" "));
+  url.searchParams.set("state", state);
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("show_dialog", "true");
+
+  window.location.assign(url.toString());
+}, [clientId, redirectUri, scopes]);
 
   // 4) Optional refresh-on-demand
   const refresh = useCallback(async () => {
