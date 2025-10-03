@@ -341,21 +341,41 @@ const connectToSpotify = useCallback(() => {
     setPayOpen(false);
   }, []);
 
-  const startCheckout = useCallback(async () => {
-    try {
-      const r = await fetch(`${API_BASE_URL}/api/create-checkout-session`, { method: "POST" });
-      const j = await r.json();
-      if (j?.url) {
-        setPayOpen(false);
+const startCheckout = useCallback(async () => {
+  try {
+    // Always use Vercel for API endpoints
+    const apiUrl = 'https://wedding-playlist-zeta.vercel.app/api/create-checkout-session';
+    
+    const r = await fetch(apiUrl, { 
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        // Add any data you need to send
+      })
+    });
+    
+    const j = await r.json();
+    if (j?.url || j?.sessionId) {
+      setPayOpen(false);
+      // If using Stripe Checkout hosted page
+      if (j.url) {
         window.location.assign(j.url);
-      } else {
-        alert("Couldn't start checkout.");
       }
-    } catch (e) {
-      console.error(e);
-      alert("Checkout error.");
+      // If you get a sessionId, you might need to redirect to Stripe
+      else if (j.sessionId) {
+        // You'll need to load Stripe.js and redirect
+        alert("Got session ID: " + j.sessionId);
+      }
+    } else {
+      alert("Couldn't start checkout: " + (j?.error || "Unknown error"));
     }
-  }, [setPayOpen]);
+  } catch (e) {
+    console.error(e);
+    alert("Checkout error: " + e.message);
+  }
+}, [setPayOpen]);
 
   // Theme for cards
   const themes = [
