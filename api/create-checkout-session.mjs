@@ -18,7 +18,7 @@ function setCors(res, origin) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
@@ -29,24 +29,21 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+
+  // Figure out where to send users back after Stripe
+  const site =
+    (req.query.site && decodeURIComponent(req.query.site)) ||
+    process.env.SITE_URL ||
+    (ALLOWLIST.has(origin) ? origin : "https://swipetodance.trentkoch.com");
 
   try {
-    // Where to send users back after checkout
-    const site =
-      process.env.SITE_URL ||
-      (origin && ALLOWLIST.has(origin) ? origin : "https://swipetodance.trentkoch.com");
-
-    // $6.99 example
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
         {
           price_data: {
             currency: "usd",
-            unit_amount: 699,
+            unit_amount: 699, // $6.99 example
             product_data: {
               name: "Swipe to Dance — Pro",
               description: "Upload your own songs + export to Spotify",
@@ -59,7 +56,19 @@ export default async function handler(req, res) {
       cancel_url: `${site}?checkout=cancelled`,
     });
 
-    return res.status(200).json({ url: session.url });
+    // For navigation (no CORS) just 302 to Stripe
+    if (req.method === "GET") {
+      res.statusCode = 302;
+      res.setHeader("Location", session.url);
+      return res.end();
+    }
+
+    // For local dev POST usage
+    if (req.method === "POST") {
+      return res.status(200).json({ url: session.url });
+    }
+
+    return res.status(405).json({ error: "Method not allowed" });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "create_session_failed" });

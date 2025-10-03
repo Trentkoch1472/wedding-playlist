@@ -339,41 +339,18 @@ const connectToSpotify = useCallback(() => {
     setPayOpen(false);
   }, []);
 
-const startCheckout = useCallback(async () => {
+const startCheckout = useCallback(() => {
   try {
-    // Always use Vercel for API endpoints
-    const apiUrl = 'https://wedding-playlist-zeta.vercel.app/api/create-checkout-session';
-    
-    const r = await fetch(apiUrl, { 
-      method: "POST",
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        // Add any data you need to send
-      })
-    });
-    
-    const j = await r.json();
-    if (j?.url || j?.sessionId) {
-      setPayOpen(false);
-      // If using Stripe Checkout hosted page
-      if (j.url) {
-        window.location.assign(j.url);
-      }
-      // If you get a sessionId, you might need to redirect to Stripe
-      else if (j.sessionId) {
-        // You'll need to load Stripe.js and redirect
-        alert("Got session ID: " + j.sessionId);
-      }
-    } else {
-      alert("Couldn't start checkout: " + (j?.error || "Unknown error"));
-    }
+    const site = window.location.origin; // where Stripe should send you back
+    const url = `https://wedding-playlist-zeta.vercel.app/api/create-checkout-session?site=${encodeURIComponent(site)}`;
+    setPayOpen(false);
+    window.location.assign(url); // top-level navigation = no CORS
   } catch (e) {
     console.error(e);
-    alert("Checkout error: " + e.message);
+    alert("Checkout error.");
   }
 }, [setPayOpen]);
+
 
   // Theme for cards
   const themes = [
