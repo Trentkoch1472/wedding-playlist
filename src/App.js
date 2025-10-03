@@ -272,10 +272,8 @@ const connectToSpotify = useCallback(() => {
   }
 }, [SPOTIFY_REDIRECT_URI, spotifyLogin]);
 
-  const API_BASE_URL =
-    /swipetodance\.trentkoch\.com|vercel\.app$/i.test(window.location.hostname)
-      ? ""
-      : "https://wedding-playlist-zeta.vercel.app";
+ const API_BASE_URL = "https://wedding-playlist-zeta.vercel.app";
+
 
   // Local storage state
   function useLocalState(key, initial) {
