@@ -1,31 +1,36 @@
-export default async function handler(req, res) {
-  // Set CORS headers for all requests
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
+const startCheckout = useCallback(async () => {
   try {
-    // For now, return a test response to verify it's working
-    res.status(200).json({ 
-      success: true,
-      message: 'Checkout endpoint is working!',
-      // When you're ready to use real Stripe, you'll return:
-      // url: session.url
+    const apiUrl = 'https://wedding-playlist-zeta.vercel.app/api/create-checkout-session';
+    
+    const r = await fetch(apiUrl, { 
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
     });
     
-  } catch (error) {
-    console.error('Checkout error:', error);
-    res.status(500).json({ error: error.message });
+    const j = await r.json();
+    console.log('Checkout response:', j); // Check console to see the response
+    
+    // Handle test response
+    if (j?.success && j?.message) {
+      alert('Test mode: ' + j.message);
+      // When you add real Stripe, remove this and uncomment below
+      return;
+    }
+    
+    // Handle real Stripe response
+    if (j?.url) {
+      setPayOpen(false);
+      window.location.assign(j.url);
+    } else if (j?.sessionId) {
+      alert("Got session ID: " + j.sessionId);
+    } else {
+      alert("Unexpected response: " + JSON.stringify(j));
+    }
+  } catch (e) {
+    console.error('Checkout error:', e);
+    alert("Checkout error: " + e.message);
   }
-}
+}, [setPayOpen]);
