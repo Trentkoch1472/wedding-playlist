@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const API_BASE = "https://api.spotify.com/v1";
 
-// Always hit your Vercel function (works from GH Pages/custom domain/local dev)
-const TOKEN_PROXY = "https://wedding-playlist-zeta.vercel.app/api/spotify-token";
+// Always hit same-origin serverless function
+const TOKEN_PROXY = "/api/spotify-token";
 
 // Storage keys
 const LS_TOKEN = "sp_token_v2";                 // { accessToken, refreshToken, expAt }
@@ -79,11 +79,10 @@ export default function useSpotify({
         try {
           // Use the same redirect URI that initiated login
           const fromStore = sessionStorage.getItem(SS_REDIRECT_URI);
-const lockedRedirect =
-  fromStore && fromStore.startsWith(window.location.origin)
-    ? fromStore
-    : redirectUri;
-
+          const lockedRedirect =
+            fromStore && fromStore.startsWith(window.location.origin)
+              ? fromStore
+              : redirectUri;
 
           const body = new URLSearchParams({
             grant_type: "authorization_code",

@@ -225,23 +225,8 @@ export default function App() {
     document.title = "Swipe to Dance";
   }, []);
 
-// Always send a redirect URI that actually exists
-const SPOTIFY_REDIRECT_URI = (() => {
-  const h = window.location.hostname;
-
-  // For local dev, use the GitHub Pages https URL so Spotify accepts it
-  if (h === "localhost" || h === "127.0.0.1") {
-    return "https://trentkoch1472.github.io/wedding-playlist";
-  }
-
-  // Custom domain (production) — NO path
-  if (h === "swipetodance.trentkoch.com") {
-    return "https://swipetodance.trentkoch.com";
-  }
-
-  // Default to the GH Pages URL (also in your Spotify allow-list)
-  return "https://trentkoch1472.github.io/wedding-playlist";
-})();
+// Spotify must always send users back to ONE exact URL
+const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
 
 // Keep your existing auto-start login useEffect as-is
 useEffect(() => {
@@ -271,9 +256,6 @@ const connectToSpotify = useCallback(() => {
     spotifyLogin();
   }
 }, [SPOTIFY_REDIRECT_URI, spotifyLogin]);
-
- const API_BASE_URL = "https://wedding-playlist-zeta.vercel.app";
-
 
   // Local storage state
   function useLocalState(key, initial) {
@@ -339,18 +321,25 @@ const connectToSpotify = useCallback(() => {
     setPayOpen(false);
   }, []);
 
-const startCheckout = useCallback(() => {
+const startCheckout = useCallback(async () => {
   try {
-    const site = window.location.origin; // where Stripe should send you back
-    const url = `https://wedding-playlist-zeta.vercel.app/api/create-checkout-session?site=${encodeURIComponent(site)}`;
-    setPayOpen(false);
-    window.location.assign(url); // top-level navigation = no CORS
+    const r = await fetch(`/api/create-checkout-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const j = await r.json();
+    if (j?.url) {
+      setPayOpen(false);
+      window.location.assign(j.url);
+    } else {
+      alert("Couldn't start checkout" + (j?.error ? `: ${j.error}` : "."));
+    }
   } catch (e) {
     console.error(e);
-    alert("Checkout error.");
+    alert("Checkout error: " + (e?.message || "Network"));
   }
 }, [setPayOpen]);
-
 
   // Theme for cards
   const themes = [
@@ -392,7 +381,7 @@ const startCheckout = useCallback(() => {
 
     (async () => {
       try {
-        const r = await fetch(`${API_BASE_URL}/api/verify-session?session_id=${sid}`);
+       const r = await fetch(`/api/verify-session?session_id=${sid}`);
         const j = await r.json();
         if (j.ok) {
           setProUnlocked(true);
