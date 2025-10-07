@@ -3,6 +3,7 @@
   "homepage": "https://swipetodance.trentkoch.com",
   "version": "0.1.0",
   "private": true,
+  "type": "commonjs",
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",

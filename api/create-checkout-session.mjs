@@ -1,76 +1,66 @@
-// api/create-checkout-session.mjs
-import Stripe from "stripe";
+// /api/create-checkout-session.js
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2022-11-15",
-});
-
-const ALLOWLIST = new Set([
+const ALLOWED = new Set([
   "https://swipetodance.trentkoch.com",
-  "https://trentkoch1472.github.io",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
+  "https://trentkoch1472.github.io",
+  "https://trentkoch1472.github.io/wedding-playlist"
 ]);
-
-function setCors(res, origin) {
-  if (ALLOWLIST.has(origin)) {
+function setCORS(req, res) {
+  const origin = req.headers.origin || "";
+  if (ALLOWED.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-export default async function handler(req, res) {
-  const origin = req.headers.origin || "";
-  setCors(res, origin);
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  // Figure out where to send users back after Stripe
-  const site =
-    (req.query.site && decodeURIComponent(req.query.site)) ||
-    process.env.SITE_URL ||
-    (ALLOWLIST.has(origin) ? origin : "https://swipetodance.trentkoch.com");
-
+module.exports = async (req, res) => {
   try {
+    setCORS(req, res);
+    if (req.method === "OPTIONS") return res.status(204).end();
+    if (req.method !== "GET" && req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+
+    const priceId = process.env.STRIPE_PRICE_ID || process.env.PRICE_ID;
+    if (!process.env.STRIPE_SECRET_KEY || !priceId) {
+      return res.status(500).json({
+        error: "Server misconfigured",
+        message: "Missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID"
+      });
+    }
+
+    const siteFromQuery = req.method === "GET" ? req.query.site : undefined;
+    const siteFromBody = req.method === "POST" && req.body ? req.body.site : undefined;
+    const origin = req.headers.origin || "";
+    const site =
+      siteFromQuery ||
+      siteFromBody ||
+      process.env.SITE_URL ||
+      origin ||
+      "https://swipetodance.trentkoch.com";
+
+    const siteBase = String(site).replace(/\/$/, "");
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            unit_amount: 699, // $6.99 example
-            product_data: {
-              name: "Swipe to Dance — Pro",
-              description: "Upload your own songs + export to Spotify",
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: `${site}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${site}?checkout=cancelled`,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${siteBase}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteBase}/?canceled=1`,
+      metadata: { app: "swipe-to-dance" }
     });
 
-    // For navigation (no CORS) just 302 to Stripe
     if (req.method === "GET") {
-      res.statusCode = 302;
-      res.setHeader("Location", session.url);
+      res.writeHead(302, { Location: session.url });
       return res.end();
     }
-
-    // For local dev POST usage
-    if (req.method === "POST") {
-      return res.status(200).json({ url: session.url });
-    }
-
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(200).json({ url: session.url, id: session.id });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: "create_session_failed" });
+    console.error("Stripe create session error:", e);
+    return res.status(500).json({ error: "Stripe error", message: e.message || "unknown" });
   }
-}
+};

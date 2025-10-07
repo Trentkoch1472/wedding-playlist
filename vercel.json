@@ -8,10 +8,21 @@
           "value": "default-src 'self'; img-src 'self' data: blob: https://*.mzstatic.com https://*.scdn.co https://i.scdn.co; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://itunes.apple.com https://api.allorigins.win https://*.vercel.app; frame-ancestors 'none';"
         }
       ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
     }
   ],
   "functions": {
-    "api/spotify-token.js": {
+    "api/*": {
+      "runtime": "nodejs18.x",
       "maxDuration": 10
     }
   }
