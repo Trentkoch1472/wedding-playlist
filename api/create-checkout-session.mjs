@@ -1,66 +1,52 @@
-// /api/create-checkout-session.js
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+import Stripe from 'stripe';
 
-const ALLOWED = new Set([
-  "https://swipetodance.trentkoch.com",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "https://trentkoch1472.github.io",
-  "https://trentkoch1472.github.io/wedding-playlist"
-]);
-function setCORS(req, res) {
-  const origin = req.headers.origin || "";
-  if (ALLOWED.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Cache-Control', 'no-store');
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
+  setCors(res);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
   try {
-    setCORS(req, res);
-    if (req.method === "OPTIONS") return res.status(204).end();
-    if (req.method !== "GET" && req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    const priceId = process.env.STRIPE_PRICE_ID || process.env.PRICE_ID;
-    if (!process.env.STRIPE_SECRET_KEY || !priceId) {
-      return res.status(500).json({
-        error: "Server misconfigured",
-        message: "Missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID"
-      });
-    }
-
-    const siteFromQuery = req.method === "GET" ? req.query.site : undefined;
-    const siteFromBody = req.method === "POST" && req.body ? req.body.site : undefined;
-    const origin = req.headers.origin || "";
-    const site =
-      siteFromQuery ||
-      siteFromBody ||
-      process.env.SITE_URL ||
-      origin ||
-      "https://swipetodance.trentkoch.com";
-
-    const siteBase = String(site).replace(/\/$/, "");
+    const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
+    const priceId = process.env.PRICE_ID; // optional, if you set one
 
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${siteBase}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteBase}/?canceled=1`,
-      metadata: { app: "swipe-to-dance" }
+      mode: 'payment',
+      // If you have a Price, use line_items: [{ price: priceId, quantity: 1 }]
+      line_items: priceId
+        ? [{ price: priceId, quantity: 1 }]
+        : [{
+            price_data: {
+              currency: 'usd',
+              product_data: { name: 'Swipe to Dance — Pro (lifetime)' },
+              unit_amount: 500, // $5.00
+            },
+            quantity: 1,
+          }],
+      success_url: `${SITE_URL}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${SITE_URL}/?canceled=1`,
+      allow_promotion_codes: true,
     });
 
-    if (req.method === "GET") {
-      res.writeHead(302, { Location: session.url });
-      return res.end();
-    }
-    return res.status(200).json({ url: session.url, id: session.id });
-  } catch (e) {
-    console.error("Stripe create session error:", e);
-    return res.status(500).json({ error: "Stripe error", message: e.message || "unknown" });
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    console.error('create-checkout-session error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
   }
-};
+}
