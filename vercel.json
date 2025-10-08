@@ -1,4 +1,7 @@
 {
-  "buildCommand": "GENERATE_SOURCEMAP=false npm run build",
-  "outputDirectory": "build"
+  "build": {
+    "env": {
+      "GENERATE_SOURCEMAP": "false"
+    }
+  }
 }
