@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "build": {
+    "env": {
+      "GENERATE_SOURCEMAP": "false"
+    }
+  },
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "builds": [
