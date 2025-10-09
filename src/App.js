@@ -309,6 +309,7 @@ const connectToSpotify = useCallback(() => {
   const unlockPro = useCallback(() => {
     setProUnlocked(true);
     setPayOpen(false);
+    showToast('🎉 Pro features unlocked!', 'success');
     if (typeof pendingActionRef.current === "function") {
       const run = pendingActionRef.current;
       pendingActionRef.current = null;
@@ -802,9 +803,9 @@ const startCheckout = useCallback(async () => {
         const next = dedupeSongs([...prev, ...clean]);
         const added = next.length - before;
         if (added > 0) {
-          showToast(`${added} ${added === 1 ? "song" : "songs"} added`);
+         showToast(`✅ ${added} ${added === 1 ? "song" : "songs"} successfully added!`, 'success');
         } else {
-          showToast("No new songs added (all duplicates)");
+          showToast("No new songs added (all duplicates)", 'info');
         }
         return next;
       });
@@ -812,7 +813,7 @@ const startCheckout = useCallback(async () => {
       setSongs(clean);
       setIndex(0);
       setChoices({});
-      showToast(`Replaced with ${clean.length} ${clean.length === 1 ? "song" : "songs"}`);
+       showToast(`✅ Songs successfully replaced! (${clean.length} ${clean.length === 1 ? "song" : "songs"})`, 'success');
     }
   };
 
