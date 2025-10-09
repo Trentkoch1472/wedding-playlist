@@ -135,21 +135,44 @@ export default function App() {
   const mobileUploadMenuRef = useRef(null);
 
   // Handlers for Upload menu
-  const triggerUploadAdd = () => {
-    requirePro(() => {
+const triggerUploadAdd = () => {
+  requirePro(() => {
+    if (window.confirm(
+      "CSV Upload Requirements:\n\n" +
+      "• File must be CSV format (.csv), not Excel (.xlsx)\n" +
+      "• First row must be headers (title, artist)\n" +
+      "• Example:\n" +
+      "  title,artist\n" +
+      "  Sweet Caroline,Neil Diamond\n\n" +
+      "Also accepts: song/Song/Track and artist/Artist/Performer\n\n" +
+      "Click OK to select your file."
+    )) {
       pendingUploadModeRef.current = "add";
       fileInputRef.current?.click();
-      setUploadOpen(false);
-    });
-  };
+    }
+    setUploadOpen(false);
+  });
+};
 
-  const triggerUploadReplace = () => {
-    requirePro(() => {
+const triggerUploadReplace = () => {
+  requirePro(() => {
+    if (window.confirm(
+      "CSV Upload Requirements:\n\n" +
+      "• File must be CSV format (.csv), not Excel (.xlsx)\n" +
+      "• First row must be headers (title, artist)\n" +
+      "• Example:\n" +
+      "  title,artist\n" +
+      "  Sweet Caroline,Neil Diamond\n\n" +
+      "Also accepts: song/Song/Track and artist/Artist/Performer\n\n" +
+      "⚠️ This will REPLACE all current songs!\n\n" +
+      "Click OK to select your file."
+    )) {
       pendingUploadModeRef.current = "replace";
       fileInputRef.current?.click();
-      setUploadOpen(false);
-    });
-  };
+    }
+    setUploadOpen(false);
+  });
+};
 
   // MOBILE triggers (use same file input; just close mobile menu instead)
   const triggerUploadAddMobile = () => {
@@ -917,7 +940,10 @@ const startCheckout = useCallback(async () => {
     type="file"
     accept=".csv,.json,.jsonl,.ndjson"
     className="hidden"
-    onChange={(e) => handleFiles(e.target.files?.[0], pendingUploadModeRef.current)}
+     onChange={(e) => {
+    handleFiles(e.target.files?.[0], pendingUploadModeRef.current);
+    e.target.value = '';
+  }}
   />
 
   {/* Connect to Spotify (single button) */}
