@@ -306,6 +306,9 @@ const connectToSpotify = useCallback(() => {
   const [coffeeOpen, setCoffeeOpen] = useState(false);
   const [coffeeOffered, setCoffeeOffered] = useLocalState("wps_coffee_offered", false);
 
+// Store original default songs for reset
+const defaultSongsRef = useRef(null);
+
   const maybeOfferCoffee = useCallback(() => {
     if (coffeeOffered) return;
     setCoffeeOpen(true);
@@ -738,37 +741,41 @@ const startCheckout = useCallback(async () => {
   }, [index]);
 
   /* ---- bootstrap default list on first visit ---- */
-  useEffect(() => {
-    if (songs.length > 0) return;
-    const url = `${process.env.PUBLIC_URL || ""}/default-songs.jsonl`;
-    (async () => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const text = await res.text();
-        const rows = parseJSONL(text);
-        const mapped = rows
-          .map((r) => {
-            const title = r.title ?? r.song ?? r.Song ?? r["Song Title"] ?? r["Track"] ?? "";
-            const artist = r.artist ?? r.Artist ?? r.singer ?? r["Performer"] ?? "";
-            const bpm = r.bpm ?? r.BPM ?? r.tempo ?? undefined;
-            const decade = r.decade ?? r.Decade ?? undefined;
-            const genre = r.genre ?? r.Genre ?? undefined;
-            return { __id: uid(), title: String(title).trim(), artist: String(artist || "").trim(), bpm, decade, genre };
-          })
-          .filter((r) => r.title);
-        const clean = dedupeSongs(mapped);
-        const randomized = shuffle(clean);
-        if (randomized.length) {
-          setSongs(randomized);
-          setIndex(0);
-          setChoices({});
-        }
-      } catch (e) {
-        console.warn("Default autoload skipped:", e);
+ useEffect(() => {
+  if (songs.length > 0) return;
+  const url = `${process.env.PUBLIC_URL || ""}/default-songs.jsonl`;
+  (async () => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const text = await res.text();
+      const rows = parseJSONL(text);
+      const mapped = rows
+        .map((r) => {
+          const title = r.title ?? r.song ?? r.Song ?? r["Song Title"] ?? r["Track"] ?? "";
+          const artist = r.artist ?? r.Artist ?? r.singer ?? r["Performer"] ?? "";
+          const bpm = r.bpm ?? r.BPM ?? r.tempo ?? undefined;
+          const decade = r.decade ?? r.Decade ?? undefined;
+          const genre = r.genre ?? r.Genre ?? undefined;
+          return { __id: uid(), title: String(title).trim(), artist: String(artist || "").trim(), bpm, decade, genre };
+        })
+        .filter((r) => r.title);
+      const clean = dedupeSongs(mapped);
+      const randomized = shuffle(clean);
+      
+      // Save original defaults in ref
+      defaultSongsRef.current = randomized;
+      
+      if (randomized.length) {
+        setSongs(randomized);
+        setIndex(0);
+        setChoices({});
       }
-    })();
-  }, [songs.length, setSongs, setIndex, setChoices]);
+    } catch (e) {
+      console.warn("Default autoload skipped:", e);
+    }
+  })();
+}, [songs.length, setSongs, setIndex, setChoices]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -880,13 +887,25 @@ const startCheckout = useCallback(async () => {
   };
 
   const resetAll = () => {
-    stopPreview();
-    const ok = window.confirm("Start over and shuffle the order?");
-    if (!ok) return;
+  stopPreview();
+  const ok = window.confirm("Reset to original song list and shuffle?");
+  if (!ok) return;
+  
+  if (defaultSongsRef.current) {
+    // Reset to original defaults
+    const reshuffled = shuffle([...defaultSongsRef.current]);
+    setSongs(reshuffled);
+    setIndex(0);
+    setChoices({});
+    showToast("✅ Reset to original song list!", "success");
+  } else {
+    // Fallback: just reshuffle current songs if defaults haven't loaded
     setChoices({});
     setIndex(0);
     setSongs((prev) => shuffle(prev));
-  };
+    showToast("⚠️ Shuffled current songs (original defaults not loaded yet)", "info");
+  }
+};
 
   const remaining = songs.length - Math.min(index, songs.length);
 
@@ -1431,7 +1450,7 @@ const startCheckout = useCallback(async () => {
       ) : null}
 
       {toast ? (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="fixed bottom-6 right-6 z-50">
           <div className="rounded-xl border border-pink-200 bg-white/95 shadow-lg px-4 py-2 text-sm text-pink-900">{toast}</div>
         </div>
       ) : null}
