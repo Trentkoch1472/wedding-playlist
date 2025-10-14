@@ -742,20 +742,12 @@ const startCheckout = useCallback(async () => {
 
   /* ---- bootstrap default list on first visit ---- */
 useEffect(() => {
-  console.log("useEffect running, songs.length:", songs.length);
-  if (songs.length > 0) {
-    console.log("Skipping default load - songs already exist");
-    return;
-  }
+  // Load defaults into ref on first mount, regardless of localStorage
   const url = `${process.env.PUBLIC_URL || ""}/default-songs.jsonl`;
   (async () => {
     try {
-      console.log("Fetching defaults from:", url);
       const res = await fetch(url);
-      if (!res.ok) {
-        console.log("Fetch failed:", res.status);
-        return;
-      }
+      if (!res.ok) return;
       const text = await res.text();
       const rows = parseJSONL(text);
       const mapped = rows
@@ -771,11 +763,11 @@ useEffect(() => {
       const clean = dedupeSongs(mapped);
       const randomized = shuffle(clean);
       
-      console.log("Saving to ref, count:", randomized.length);
-      // Save original defaults in ref
+      // Always save to ref for reset functionality
       defaultSongsRef.current = randomized;
       
-      if (randomized.length) {
+      // Only set as active songs if localStorage is empty
+      if (songs.length === 0 && randomized.length) {
         setSongs(randomized);
         setIndex(0);
         setChoices({});
@@ -784,7 +776,8 @@ useEffect(() => {
       console.warn("Default autoload skipped:", e);
     }
   })();
-}, [songs.length, setSongs, setIndex, setChoices]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // Empty deps - run only once on mount
 
   // keyboard shortcuts
   useEffect(() => {
