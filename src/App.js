@@ -741,13 +741,21 @@ const startCheckout = useCallback(async () => {
   }, [index]);
 
   /* ---- bootstrap default list on first visit ---- */
- useEffect(() => {
-  if (songs.length > 0) return;
+useEffect(() => {
+  console.log("useEffect running, songs.length:", songs.length);
+  if (songs.length > 0) {
+    console.log("Skipping default load - songs already exist");
+    return;
+  }
   const url = `${process.env.PUBLIC_URL || ""}/default-songs.jsonl`;
   (async () => {
     try {
+      console.log("Fetching defaults from:", url);
       const res = await fetch(url);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.log("Fetch failed:", res.status);
+        return;
+      }
       const text = await res.text();
       const rows = parseJSONL(text);
       const mapped = rows
@@ -763,6 +771,7 @@ const startCheckout = useCallback(async () => {
       const clean = dedupeSongs(mapped);
       const randomized = shuffle(clean);
       
+      console.log("Saving to ref, count:", randomized.length);
       // Save original defaults in ref
       defaultSongsRef.current = randomized;
       
