@@ -939,11 +939,86 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white text-stone-800">
       <header className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b border-stone-200/30">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <h1 className="text-xl font-light text-stone-800">Swipe to Dance</h1>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
+  <h1 className="text-xl md:text-xl text-base font-light text-stone-800">Swipe to Dance</h1>
 
-          {/* RIGHT SIDE (desktop toolbar) */}
-<div className="ml-auto hidden md:flex items-center gap-2">
+  {/* Mobile buttons (visible on small screens) */}
+  <div className="ml-auto md:hidden flex flex-wrap items-center justify-end gap-1.5">
+    {/* Connect to Spotify (mobile) */}
+    <button
+      type="button"
+      onClick={() => { if (!spUser) spotifyLogin(); }}
+      disabled={!!spUser}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-light transition-colors ${
+        spUser
+          ? "bg-emerald-100 text-emerald-800 cursor-default"
+          : "bg-emerald-600 text-white hover:bg-emerald-500"
+      }`}
+    >
+      {spUser ? "✓" : "Spotify"}
+    </button>
+
+    {/* Export (mobile) */}
+    <div className="relative" ref={mobileExportMenuRef}>
+      <button
+        onClick={() => setMobileExportOpen((v) => !v)}
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
+        disabled={!songs.length}
+      >
+        <Download size={12} />
+      </button>
+
+      {mobileExportOpen && (
+        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+            onClick={() => {
+              exportPlaylist();
+              setMobileExportOpen(false);
+            }}
+          >
+            Export playlist (CSV)
+          </button>
+
+          <button
+            className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
+            onClick={() => {
+              requirePro(() => {
+                void handleExportToSpotify();
+              });
+              setMobileExportOpen(false);
+            }}
+            disabled={spBusy}
+          >
+            <span className="text-left">
+              Export to Spotify <span className="text-rose-700/70">(Pro)</span>
+            </span>
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+            onClick={() => {
+              exportBuckets();
+              setMobileExportOpen(false);
+            }}
+          >
+            Export all buckets (3 CSVs)
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* Reset (mobile) */}
+    <button
+      onClick={resetAll}
+      className="inline-flex items-center px-2 py-1 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-xs font-light hover:bg-rose-50 transition-colors"
+    >
+      Reset
+    </button>
+  </div>
+
+  {/* RIGHT SIDE (desktop toolbar) */}
+  <div className="ml-auto hidden md:flex items-center gap-2">
   {/* Upload (menu) */}
   <div className="relative" ref={uploadMenuRef}>
     <button
@@ -1047,81 +1122,6 @@ useEffect(() => {
 </div>
 
         </div>
-
-{/* Mobile toolbar - above progress bar */}
-<div className="md:hidden border-t border-stone-200/30 px-2 py-2 flex flex-wrap items-center justify-center gap-1.5">
-  {/* Connect to Spotify (mobile) */}
-  <button
-    type="button"
-    onClick={() => { if (!spUser) spotifyLogin(); }}
-    disabled={!!spUser}
-    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-light transition-colors ${
-      spUser
-        ? "bg-emerald-100 text-emerald-800 cursor-default"
-        : "bg-emerald-600 text-white hover:bg-emerald-500"
-    }`}
-  >
-    {spUser ? "✓ Spotify" : "Spotify"}
-  </button>
-
-  {/* Export (mobile) */}
-  <div className="relative" ref={mobileExportMenuRef}>
-    <button
-      onClick={() => setMobileExportOpen((v) => !v)}
-      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
-      disabled={!songs.length}
-    >
-      <Download size={12} /> Export
-    </button>
-
-    {mobileExportOpen && (
-      <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportPlaylist();
-            setMobileExportOpen(false);
-          }}
-        >
-          Export playlist (CSV)
-        </button>
-
-        <button
-          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-          onClick={() => {
-            requirePro(() => {
-              void handleExportToSpotify();
-            });
-            setMobileExportOpen(false);
-          }}
-          disabled={spBusy}
-        >
-          <span className="text-left">
-            Export to Spotify <span className="text-rose-700/70">(Pro)</span>
-          </span>
-        </button>
-
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportBuckets();
-            setMobileExportOpen(false);
-          }}
-        >
-          Export all buckets (3 CSVs)
-        </button>
-      </div>
-    )}
-  </div>
-
-  {/* Reset (mobile) */}
-  <button
-    onClick={resetAll}
-    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-xs font-light hover:bg-rose-50 transition-colors"
-  >
-    Reset
-  </button>
-</div>
 
 <div className="h-0.5 w-full bg-rose-100">
   <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
