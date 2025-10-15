@@ -1095,7 +1095,7 @@ useEffect(() => {
                         Song {Math.min(index + 2, songs.length)} of {songs.length} • Remaining {Math.max(remaining - 1, 0)}
                       </div>
 
-                      <div className="text-center py-4">
+                      <div className="text-center py-2">
                         <div className="text-2xl font-light tracking-wide text-stone-800">{nextSong.title}</div>
 
                         {nextSong.__art ? (
@@ -1168,7 +1168,7 @@ useEffect(() => {
                   </div>
 
                   {current ? (
-                    <div className="text-center py-4">
+                    <div className="text-center py-2">
                       <div className="text-3xl font-bold tracking-tight">{current.title}</div>
 
                       {current.__art ? (
