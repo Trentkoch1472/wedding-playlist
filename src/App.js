@@ -1170,10 +1170,7 @@ useEffect(() => {
                   {current ? (
                     <div className="text-center py-8">
                       <div className="text-3xl font-bold tracking-tight">{current.title}</div>
-<div className="text-3xl font-bold tracking-tight">{current.title}</div>
-<div className="text-xs text-red-600 mt-2 break-all px-4">
-  DEBUG: {current.__art ? `✓ Has art: ${current.__art.substring(0, 80)}...` : "✗ No art - not loaded yet"}
-</div>
+
                       {current.__art ? (
                         <img
                           src={toHttps(current.__art)}
