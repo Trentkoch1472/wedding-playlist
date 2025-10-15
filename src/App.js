@@ -965,7 +965,7 @@ useEffect(() => {
         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
         disabled={!songs.length}
       >
-        <Download size={12} />
+        <Download size={12} /> Export
       </button>
 
       {mobileExportOpen && (
