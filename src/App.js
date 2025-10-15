@@ -1055,7 +1055,7 @@ useEffect(() => {
         {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 py-2">
         {!songs.length ? (
           <div className="grid place-items-center text-center py-24">
             <div className="max-w-xl">
