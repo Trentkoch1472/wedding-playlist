@@ -1048,9 +1048,14 @@ useEffect(() => {
 
         </div>
 
-        <div className="h-0.5 w-full bg-rose-100">
-          <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
-        </div>
+{/* Mobile toolbar - above progress bar */}
+<div className="md:hidden border-t border-stone-200/30 px-2 py-2 flex flex-wrap items-center justify-center gap-1.5">
+  {/* ...all the mobile toolbar code I gave you... */}
+</div>
+
+<div className="h-0.5 w-full bg-rose-100">
+  <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
+</div>
 
         {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
       </header>
@@ -1290,22 +1295,8 @@ useEffect(() => {
               </div>
             </section>
 
-           {/* Mobile controls under the card */}
-<div className="md:hidden mt-4 flex flex-wrap items-center justify-center gap-2">
-  {/* Connect to Spotify (mobile) */}
-  <button
-    type="button"
-    onClick={() => { if (!spUser) spotifyLogin(); }}
-    disabled={!!spUser}
-    className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-light transition-colors ${
-      spUser
-        ? "bg-emerald-100 text-emerald-800 cursor-default"
-        : "bg-emerald-600 text-white hover:bg-emerald-500"
-    }`}
-  >
-    {spUser ? "✓ Spotify" : "Connect Spotify"}
-  </button>
-
+           {/* Mobile controls under the card - just Upload */}
+<div className="md:hidden mt-4 flex items-center justify-center">
   {/* Upload (mobile) */}
   <div className="relative" ref={mobileUploadMenuRef}>
     <button
@@ -1326,68 +1317,6 @@ useEffect(() => {
       </div>
     )}
   </div>
-
-  {/* Export (mobile) */}
-  <div className="relative" ref={mobileExportMenuRef}>
-    <button
-      onClick={() => setMobileExportOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
-      disabled={!songs.length}
-    >
-      <Download size={16} /> Export
-    </button>
-
-    {mobileExportOpen && (
-      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportPlaylist();
-            setMobileExportOpen(false);
-          }}
-        >
-          Export playlist (CSV)
-        </button>
-
-        <button
-          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-          onClick={() => {
-            requirePro(() => {
-              void handleExportToSpotify();
-            });
-            setMobileExportOpen(false);
-          }}
-          disabled={spBusy}
-        >
-          <span className="text-left">
-            Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
-          </span>
-          <span className="ml-2 inline-flex items-center gap-1 text-xs">
-            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>{spUser ? "connected" : "not connected"}</span>
-          </span>
-        </button>
-
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => {
-            exportBuckets();
-            setMobileExportOpen(false);
-          }}
-        >
-          Export all buckets (3 CSVs)
-        </button>
-      </div>
-    )}
-  </div>
-
-  {/* Reset (mobile) */}
-  <button
-    onClick={resetAll}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors"
-  >
-    Reset
-  </button>
 </div>
 
             {/* sidebar under the card (stacked layout) */}
