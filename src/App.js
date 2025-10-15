@@ -38,11 +38,15 @@ function toHttps(u) {
 // Add this CORS proxy function at the top with your other helper functions
 async function fetchWithCORS(url) {
   try {
-    // First try direct fetch
+    // First try direct fetch with desktop user agent to avoid mobile restrictions
     const response = await fetch(url, {
       mode: "cors",
       credentials: "omit",
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
     });
+    console.log("Direct fetch succeeded for:", url);
     return response;
   } catch (error) {
     // If direct fetch fails, try with a CORS proxy
@@ -469,47 +473,53 @@ const startCheckout = useCallback(async () => {
       let bestPreview = havePreview ? song.__preview : null;
       let bestArt = haveArt ? song.__art : null;
 
-      // Try iTunes first
-      for (const q of attempts) {
-        try {
-          const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
-          const r = await fetchWithCORS(url);
-          const j = await r.json();
-          const results = Array.isArray(j.results) ? j.results : [];
+    // Try iTunes first
+for (const q of attempts) {
+  try {
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
+    console.log("Fetching iTunes for:", q);
+    const r = await fetchWithCORS(url);
+    console.log("iTunes fetch status:", r.status, r.ok);
+    const j = await r.json();
+    console.log("iTunes results count:", j.results?.length || 0);
+    const results = Array.isArray(j.results) ? j.results : [];
 
-          const tn = normalize(song.title);
-          const an = normalize(song.artist || "");
+    const tn = normalize(song.title);
+    const an = normalize(song.artist || "");
 
-          let bestItem = null;
-          let bestScore = -1;
-          for (const it of results) {
-            const t2 = normalize(it.trackName || "");
-            const a2 = normalize(it.artistName || "");
-            let score = 0;
-            if (t2 === tn) score += 3;
-            if (a2 && an && a2 === an) score += 3;
-            if (t2.includes(tn) || tn.includes(t2)) score += 1;
-            if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
-            if (score > bestScore) {
-              bestScore = score;
-              bestItem = it;
-            }
-          }
-
-          const item = bestItem || results[0];
-          if (item) {
-            if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
-            if (!bestArt) {
-              const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
-              if (raw) {
-                const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
-                bestArt = big || raw;
-              }
-            }
-          }
-          if (bestPreview && bestArt) break;
-        } catch {}
+    let bestItem = null;
+    let bestScore = -1;
+    for (const it of results) {
+      const t2 = normalize(it.trackName || "");
+      const a2 = normalize(it.artistName || "");
+      let score = 0;
+      if (t2 === tn) score += 3;
+      if (a2 && an && a2 === an) score += 3;
+      if (t2.includes(tn) || tn.includes(t2)) score += 1;
+      if (a2 && an && (a2.includes(an) || an.includes(a2))) score += 1;
+      if (score > bestScore) {
+        bestScore = score;
+        bestItem = it;
       }
+    }
+
+    const item = bestItem || results[0];
+    if (item) {
+      if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
+      if (!bestArt) {
+        const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
+        if (raw) {
+          const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
+          bestArt = big || raw;
+          console.log("Found art:", bestArt);
+        }
+      }
+    }
+    if (bestPreview && bestArt) break;
+  } catch (e) {
+    console.error("iTunes fetch error:", e);
+  }
+}
 
       // Spotify fallback (needs token)
       if ((!bestPreview || !bestArt) && findTrackMeta) {
