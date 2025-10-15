@@ -1089,7 +1089,7 @@ useEffect(() => {
                     }}
                   >
                     <div
-                      className={`relative rounded-3xl ${themeNext.bg} shadow-xl border ${themeNext.border} p-6 md:p-8 min-h-[420px] md:min-h-[480px] flex flex-col justify-between`}
+                      className={`relative rounded-3xl ${themeNext.bg} shadow-xl border ${themeNext.border} p-6 md:p-8 min-h-[360px] md:min-h-[480px] flex flex-col justify-between`}
                     >
                       <div className="text-sm font-light text-stone-400">
                         Song {Math.min(index + 2, songs.length)} of {songs.length} • Remaining {Math.max(remaining - 1, 0)}
@@ -1147,8 +1147,8 @@ useEffect(() => {
                 <div
                   key={current ? current.__id : "empty"}
                   className={`relative rounded-3xl ${theme.bg} shadow-xl hover:shadow-2xl hover:shadow-rose-100 transition-shadow border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
-                    "min-h[420px]",
-                    "min-h-[420px]"
+                    "min-h[360px]",
+                    "min-h-[360px]"
                   )}
                   style={{
                     transform:
@@ -1292,91 +1292,105 @@ useEffect(() => {
               </div>
             </section>
 
-            {/* Mobile controls under the card (NO Spotify connect button) */}
-            <div className="md:hidden mt-4 flex items-center justify-center gap-2">
-              {/* Upload (mobile) */}
-              <div className="relative" ref={mobileUploadMenuRef}>
-                <button
-                  onClick={() => setMobileUploadOpen((v) => !v)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                >
-                  <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
-                </button>
+           {/* Mobile controls under the card */}
+<div className="md:hidden mt-4 flex flex-wrap items-center justify-center gap-2">
+  {/* Connect to Spotify (mobile) */}
+  <button
+    type="button"
+    onClick={() => { if (!spUser) spotifyLogin(); }}
+    disabled={!!spUser}
+    className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-light transition-colors ${
+      spUser
+        ? "bg-emerald-100 text-emerald-800 cursor-default"
+        : "bg-emerald-600 text-white hover:bg-emerald-500"
+    }`}
+  >
+    {spUser ? "✓ Spotify" : "Connect Spotify"}
+  </button>
 
-                {mobileUploadOpen && (
-                  <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAddMobile}>
-                      Add to existing songs <span className="text-rose-700/70">(Pro)</span>
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplaceMobile}>
-                      Replace songs <span className="text-rose-700/70">(Pro)</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+  {/* Upload (mobile) */}
+  <div className="relative" ref={mobileUploadMenuRef}>
+    <button
+      onClick={() => setMobileUploadOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors"
+    >
+      <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
+    </button>
 
-              {/* Export (mobile) */}
-              <div className="relative" ref={mobileExportMenuRef}>
-                <button
-                  onClick={() => setMobileExportOpen((v) => !v)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                  disabled={!songs.length}
-                >
-                  <Download size={16} /> Export
-                </button>
+    {mobileUploadOpen && (
+      <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAddMobile}>
+          Add to existing songs <span className="text-rose-700/70">(Pro)</span>
+        </button>
+        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplaceMobile}>
+          Replace songs <span className="text-rose-700/70">(Pro)</span>
+        </button>
+      </div>
+    )}
+  </div>
 
-                {mobileExportOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                      onClick={() => {
-                        exportPlaylist();
-                        setMobileExportOpen(false);
-                      }}
-                    >
-                      Export playlist (CSV)
-                    </button>
+  {/* Export (mobile) */}
+  <div className="relative" ref={mobileExportMenuRef}>
+    <button
+      onClick={() => setMobileExportOpen((v) => !v)}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
+      disabled={!songs.length}
+    >
+      <Download size={16} /> Export
+    </button>
 
-                    <button
-                      className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-                      onClick={() => {
-                        requirePro(() => {
-                          void handleExportToSpotify();
-                        });
-                        setMobileExportOpen(false);
-                      }}
-                      disabled={spBusy}
-                    >
-                      <span className="text-left">
-                        Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
-                      </span>
-                      <span className="ml-2 inline-flex items-center gap-1 text-xs">
-                        <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-                        <span className={spUser ? "text-emerald-700" : "text-slate-500"}>{spUser ? "connected" : "not connected"}</span>
-                      </span>
-                    </button>
+    {mobileExportOpen && (
+      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => {
+            exportPlaylist();
+            setMobileExportOpen(false);
+          }}
+        >
+          Export playlist (CSV)
+        </button>
 
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-                      onClick={() => {
-                        exportBuckets();
-                        setMobileExportOpen(false);
-                      }}
-                    >
-                      Export all buckets (3 CSVs)
-                    </button>
-                  </div>
-                )}
-              </div>
+        <button
+          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
+          onClick={() => {
+            requirePro(() => {
+              void handleExportToSpotify();
+            });
+            setMobileExportOpen(false);
+          }}
+          disabled={spBusy}
+        >
+          <span className="text-left">
+            Export to Spotify <span className="text-rose-700/70">(Pro)</span> {spBusy ? "…" : ""}
+          </span>
+          <span className="ml-2 inline-flex items-center gap-1 text-xs">
+            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
+            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>{spUser ? "connected" : "not connected"}</span>
+          </span>
+        </button>
 
-              {/* Reset (mobile) */}
-              <button
-                onClick={resetAll}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-              >
-                Reset
-              </button>
-            </div>
+        <button
+          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
+          onClick={() => {
+            exportBuckets();
+            setMobileExportOpen(false);
+          }}
+        >
+          Export all buckets (3 CSVs)
+        </button>
+      </div>
+    )}
+  </div>
+
+  {/* Reset (mobile) */}
+  <button
+    onClick={resetAll}
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors"
+  >
+    Reset
+  </button>
+</div>
 
             {/* sidebar under the card (stacked layout) */}
             <aside className="space-y-4">
