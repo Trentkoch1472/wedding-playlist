@@ -1136,8 +1136,7 @@ useEffect(() => {
                       </div>
 
                       <div className="mt-3 text-center text-xs text-slate-500">
-                        Shortcuts or swipe: Left swipe = No. Right swipe or Space = Yes. Up swipe or S = Star. U or Backspace = Undo. Down
-                        swipe = Skip.
+                        Left swipe = No. Right swipe or Space = Yes. Up swipe or S = Star. Down swipe = Skip.
                       </div>
                     </div>
                   </div>
