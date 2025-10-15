@@ -1240,7 +1240,7 @@ useEffect(() => {
                   )}
 
                   {/* controls */}
-                  <div className="flex items-center justify-center gap-3 pt-4">
+                  <div className="flex items-center justify-center gap-3 pt-1">
                     <button
                       aria-label="Undo"
                       onClick={onUndo}
