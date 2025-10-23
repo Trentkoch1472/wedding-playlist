@@ -107,8 +107,7 @@ function shuffle(arr) {
 /* ========== App ========== */
 export default function App() {
   // Spotify must always send users back to ONE exact URL
-  const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/wedding-playlist";
-
+const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
   const {
     user: spUser,
     busy: spBusy,
