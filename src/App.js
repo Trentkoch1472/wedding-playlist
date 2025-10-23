@@ -253,7 +253,7 @@ const triggerUploadReplace = () => {
   }, []);
 
 // Spotify must always send users back to ONE exact URL
-const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
+const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/wedding-playlist";
 
 // Keep your existing auto-start login useEffect as-is
 useEffect(() => {
