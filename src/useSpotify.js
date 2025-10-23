@@ -216,6 +216,8 @@ export default function useSpotify({
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("show_dialog", "true");
 
+ console.log("Spotify auth URL:", url.toString());
+
     window.location.assign(url.toString());
   }, [clientId, redirectUri, scopes]);
 
