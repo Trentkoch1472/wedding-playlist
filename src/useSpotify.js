@@ -215,6 +215,7 @@ export default function useSpotify({
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("show_dialog", "true");
+    url.searchParams.set("_", Date.now().toString());
 
  console.log("Spotify auth URL:", url.toString());
 
