@@ -116,10 +116,7 @@ export default function App() {
   findTrackMeta,
 } = useSpotify({
   clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri:
-    window.location.hostname === "swipetodance.trentkoch.com"
-      ? "https://swipetodance.trentkoch.com/wedding-playlist"
-      : "https://trentkoch1472.github.io/wedding-playlist",
+  redirectUri: SPOTIFY_REDIRECT_URI
 });
 
   const fileInputRef = useRef(null);
