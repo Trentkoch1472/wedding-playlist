@@ -104,22 +104,22 @@ function shuffle(arr) {
   }
   return a;
 }
-// Spotify must always send users back to ONE exact URL
-const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/wedding-playlist";
-
 /* ========== App ========== */
 export default function App() {
+  // Spotify must always send users back to ONE exact URL
+  const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/wedding-playlist";
+
   const {
-  user: spUser,
-  busy: spBusy,
-  msg: spMsg,
-  login: spotifyLogin,
-  exportToSpotify,
-  findTrackMeta,
-} = useSpotify({
-  clientId: "7ced125c87d944d09bb2a301f8576fb8",
-  redirectUri: SPOTIFY_REDIRECT_URI
-});
+    user: spUser,
+    busy: spBusy,
+    msg: spMsg,
+    login: spotifyLogin,
+    exportToSpotify,
+    findTrackMeta,
+  } = useSpotify({
+    clientId: "7ced125c87d944d09bb2a301f8576fb8",
+    redirectUri: SPOTIFY_REDIRECT_URI
+  });
 
   const fileInputRef = useRef(null);
 
