@@ -107,7 +107,39 @@ function shuffle(arr) {
 /* ========== App ========== */
 export default function App() {
   // Spotify must always send users back to ONE exact URL
-const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
+  const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
+
+  // Detect Safari private mode
+  const [isPrivateMode, setIsPrivateMode] = useState(false);
+
+  useEffect(() => {
+    // Check if in Safari private mode
+    const checkPrivateMode = async () => {
+      try {
+        // Safari private mode blocks localStorage/indexedDB
+        if (!window.indexedDB) {
+          setIsPrivateMode(true);
+          return;
+        }
+        
+        // Additional check for iOS Safari
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isSafari) {
+          try {
+            localStorage.setItem('test', 'test');
+            localStorage.removeItem('test');
+          } catch (e) {
+            setIsPrivateMode(true);
+          }
+        }
+      } catch (e) {
+        // Probably in private mode
+      }
+    };
+    
+    checkPrivateMode();
+  }, []);
+
   const {
     user: spUser,
     busy: spBusy,
@@ -119,7 +151,7 @@ const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
     clientId: "7ced125c87d944d09bb2a301f8576fb8",
     redirectUri: SPOTIFY_REDIRECT_URI
   });
-
+  
   const fileInputRef = useRef(null);
 
   // Export dropdown state
@@ -942,17 +974,24 @@ useEffect(() => {
   <div className="ml-auto md:hidden flex flex-wrap items-center justify-end gap-1.5">
     {/* Connect to Spotify (mobile) */}
     <button
-      type="button"
-      onClick={() => { if (!spUser) spotifyLogin(); }}
-      disabled={!!spUser}
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-light transition-colors ${
-        spUser
-          ? "bg-emerald-100 text-emerald-800 cursor-default"
-          : "bg-emerald-600 text-white hover:bg-emerald-500"
-      }`}
-    >
-      {spUser ? "✓" : "Spotify"}
-    </button>
+  type="button"
+  onClick={() => {
+    if (!spUser) {
+      if (isPrivateMode) {
+        alert('⚠️ Spotify login in Safari Private Mode may require clicking "Connect Spotify" twice. For best results, use standard browsing mode.');
+      }
+      spotifyLogin();
+    }
+  }}
+  disabled={!!spUser}
+  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-light transition-colors ${
+    spUser
+      ? "bg-emerald-100 text-emerald-800 cursor-default"
+      : "bg-emerald-600 text-white hover:bg-emerald-500"
+  }`}
+>
+  {spUser ? "✓" : "Spotify"}
+</button>
 
     {/* Export (mobile) */}
     <div className="relative" ref={mobileExportMenuRef}>
@@ -1048,19 +1087,26 @@ useEffect(() => {
   }}
   />
 
-  {/* Connect to Spotify (single button) */}
-  <button
-    type="button"
-    onClick={() => { if (!spUser) spotifyLogin(); }}
-    disabled={!!spUser}
-    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-light transition-colors ${
-      spUser
-        ? "bg-emerald-100 text-emerald-800 cursor-default"
-        : "bg-emerald-600 text-white hover:bg-emerald-500"
-    }`}
-  >
-    {spUser ? "Spotify connected" : "Connect to Spotify"}
-  </button>
+{/* Connect to Spotify (single button) */}
+<button
+  type="button"
+  onClick={() => {
+    if (!spUser) {
+      if (isPrivateMode) {
+        alert('⚠️ Spotify login in Safari Private Mode may require clicking "Connect Spotify" twice. For best results, use standard browsing mode.');
+      }
+      spotifyLogin();
+    }
+  }}
+  disabled={!!spUser}
+  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-light transition-colors ${
+    spUser
+      ? "bg-emerald-100 text-emerald-800 cursor-default"
+      : "bg-emerald-600 text-white hover:bg-emerald-500"
+  }`}
+>
+  {spUser ? "Spotify connected" : "Connect to Spotify"}
+</button>
 
   {/* Export */}
   <div className="relative" ref={exportMenuRef}>
