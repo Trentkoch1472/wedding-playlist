@@ -977,8 +977,9 @@ useEffect(() => {
   type="button"
   onClick={() => {
     if (!spUser) {
-      if (isPrivateMode) {
-        alert('⚠️ Spotify login in Safari Private Mode may require clicking "Connect Spotify" twice. For best results, use standard browsing mode.');
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (isSafari) {
+        alert('⚠️ Note: If using Safari Private Mode, you may need to click "Connect" twice.\n\nTip: Use standard browsing mode for best results.');
       }
       spotifyLogin();
     }
@@ -1092,8 +1093,9 @@ useEffect(() => {
   type="button"
   onClick={() => {
     if (!spUser) {
-      if (isPrivateMode) {
-        alert('⚠️ Spotify login in Safari Private Mode may require clicking "Connect Spotify" twice. For best results, use standard browsing mode.');
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (isSafari) {
+        alert('⚠️ Note: If using Safari Private Mode, you may need to click "Connect" twice.\n\nTip: Use standard browsing mode for best results.');
       }
       spotifyLogin();
     }
