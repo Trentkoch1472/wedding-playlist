@@ -968,7 +968,11 @@ useEffect(() => {
     <div className="min-h-screen bg-white text-stone-800">
       <header className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b border-stone-200/30">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-  <h1 className="text-xl md:text-xl text-base font-light text-stone-800">Swipe to Dance</h1>
+<img 
+  src="/logo.png" 
+  alt="Swipe to Dance" 
+  className="h-8 md:h-10"
+/>
 
   {/* Mobile buttons (visible on small screens) */}
   <div className="ml-auto md:hidden flex flex-wrap items-center justify-end gap-1.5">
