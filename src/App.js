@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import OnboardingScreen from "./OnboardingScreen";
+import ExportScreen from "./ExportScreen";
 import { useSwipeable } from "react-swipeable";
 import Papa from "papaparse";
 import useSpotify from "./useSpotify";
@@ -12,6 +14,7 @@ import {
   SkipForward,
   Play,
   Pause,
+  Settings,
 } from "lucide-react";
 const DONATION_URL = "https://buymeacoffee.com/your-link"; // <-- put your real link
 
@@ -154,22 +157,20 @@ export default function App() {
   
   const fileInputRef = useRef(null);
 
-  // Export dropdown state
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportMenuRef = useRef(null);
-  // Upload dropdown state
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const uploadMenuRef = useRef(null);
   const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
 
-  // MOBILE: separate dropdown state/refs (only visible on small screens)
-  const [mobileExportOpen, setMobileExportOpen] = useState(false);
-  const mobileExportMenuRef = useRef(null);
-  const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
-  const mobileUploadMenuRef = useRef(null);
+  // Settings drawer
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Export screen
+  const [showExport, setShowExport] = useState(false);
 
   // Handlers for Upload menu
 const triggerUploadAdd = () => {
+  setDrawerOpen(false);
   requirePro(() => {
     if (window.confirm(
       "CSV Upload Requirements:\n\n" +
@@ -184,11 +185,11 @@ const triggerUploadAdd = () => {
       pendingUploadModeRef.current = "add";
       fileInputRef.current?.click();
     }
-    setUploadOpen(false);
   });
 };
 
 const triggerUploadReplace = () => {
+  setDrawerOpen(false);
   requirePro(() => {
     if (window.confirm(
       "CSV Upload Requirements:\n\n" +
@@ -204,82 +205,19 @@ const triggerUploadReplace = () => {
       pendingUploadModeRef.current = "replace";
       fileInputRef.current?.click();
     }
-    setUploadOpen(false);
   });
 };
 
-  // MOBILE triggers (use same file input; just close mobile menu instead)
-  const triggerUploadAddMobile = () => {
-    requirePro(() => {
-      pendingUploadModeRef.current = "add";
-      fileInputRef.current?.click();
-      setMobileUploadOpen(false);
-    });
-  };
-
-  const triggerUploadReplaceMobile = () => {
-    requirePro(() => {
-      pendingUploadModeRef.current = "replace";
-      fileInputRef.current?.click();
-      setMobileUploadOpen(false);
-    });
-  };
-
-  // close the Upload menu on outside click / ESC
+  // Close drawer on ESC
   useEffect(() => {
-    const onDocClick = (e) => {
-      if (!uploadMenuRef.current) return;
-      if (!uploadMenuRef.current.contains(e.target)) setUploadOpen(false);
-    };
-    const onKey = (e) => e.key === "Escape" && setUploadOpen(false);
-    document.addEventListener("click", onDocClick);
+    const onKey = (e) => { if (e.key === "Escape") setDrawerOpen(false); };
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (!exportMenuRef.current) return;
-      if (!exportMenuRef.current.contains(e.target)) setExportOpen(false);
-    };
-    const onKey = (e) => e.key === "Escape" && setExportOpen(false);
-    document.addEventListener("click", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, []);
-  // MOBILE: close menus on outside click / ESC
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (mobileUploadMenuRef.current && !mobileUploadMenuRef.current.contains(e.target)) {
-        setMobileUploadOpen(false);
-      }
-      if (mobileExportMenuRef.current && !mobileExportMenuRef.current.contains(e.target)) {
-        setMobileExportOpen(false);
-      }
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        setMobileUploadOpen(false);
-        setMobileExportOpen(false);
-      }
-    };
-    document.addEventListener("click", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
   // Set browser tab title
   useEffect(() => {
-    document.title = "Swipe to Dance";
+    document.title = "SwipeDJ";
   }, []);
 
 
@@ -331,6 +269,7 @@ const connectToSpotify = useCallback(() => {
   }
 
   // Core state
+  const [onboarded, setOnboarded] = useLocalState("wps_onboarded", false);
   const [songs, setSongs] = useLocalState("wps_songs", []);
   const [index, setIndex] = useLocalState("wps_index", 0);
   const [choices, setChoices] = useLocalState("wps_choices", {});
@@ -402,7 +341,7 @@ const startCheckout = useCallback(async () => {
 
   // Theme for cards
   const themes = [
-    { bg: "bg-rose-50", border: "border-rose-200" },
+    { bg: "bg-[#FFE8E0]", border: "border-rose-200" },
     { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" },
   ];
   const theme = themes[index % 2];
@@ -469,6 +408,13 @@ const startCheckout = useCallback(async () => {
   const starList = useMemo(() => songs.filter((s) => choices[s.__id]?.status === "star"), [songs, choices]);
 
   const progress = songs.length ? Math.min(index, songs.length) / songs.length : 0;
+
+  // Auto-navigate to export when all songs have been reviewed
+  useEffect(() => {
+    if (songs.length > 0 && index >= songs.length) {
+      setShowExport(true);
+    }
+  }, [songs.length, index]);
 
   /* ---- Preview audio + cover art ---- */
   const [previewAudio, setPreviewAudio] = useState(null);
@@ -795,7 +741,17 @@ useEffect(() => {
           const bpm = r.bpm ?? r.BPM ?? r.tempo ?? undefined;
           const decade = r.decade ?? r.Decade ?? undefined;
           const genre = r.genre ?? r.Genre ?? undefined;
-          return { __id: uid(), title: String(title).trim(), artist: String(artist || "").trim(), bpm, decade, genre };
+          return {
+            __id: uid(),
+            title: String(title).trim(),
+            artist: String(artist || "").trim(),
+            bpm, decade, genre,
+            energy: r.energy ?? undefined,
+            explicit: r.explicit ?? undefined,
+            language: r.language ?? undefined,
+            cultural_tags: r.cultural_tags ?? [],
+            suitable_for: r.suitable_for ?? [],
+          };
         })
         .filter((r) => r.title);
       const clean = dedupeSongs(mapped);
@@ -804,8 +760,8 @@ useEffect(() => {
       // Always save to ref for reset functionality
       defaultSongsRef.current = randomized;
       
-      // Only set as active songs if localStorage is empty
-      if (songs.length === 0 && randomized.length) {
+      // Only set as active songs if onboarding is done and localStorage is empty
+      if (onboarded && songs.length === 0 && randomized.length) {
         setSongs(randomized);
         setIndex(0);
         setChoices({});
@@ -964,221 +920,238 @@ useEffect(() => {
   const nextOpacity = fling.active ? 1.0 : drag.active ? 0.9 + 0.1 * dragAmount : 0.9;
 
   /* ---------- UI ---------- */
+
+  if (!onboarded) {
+    return (
+      <OnboardingScreen
+        onComplete={(filteredSongs) => {
+          setSongs(filteredSongs);
+          setIndex(0);
+          setChoices({});
+          setOnboarded(true);
+        }}
+      />
+    );
+  }
+
+  if (showExport) {
+    return (
+      <ExportScreen
+        acceptedSongs={yesList}
+        starredSongs={starList}
+        proUnlocked={proUnlocked}
+        spUser={spUser}
+        spBusy={spBusy}
+        onExportCSV={exportPlaylist}
+        onExportSpotify={handleExportToSpotify}
+        onSpotifyLogin={spotifyLogin}
+        onStartCheckout={startCheckout}
+        onReset={() => {
+          stopPreview();
+          setSongs([]);
+          setIndex(0);
+          setChoices({});
+          setShowExport(false);
+          setOnboarded(false);
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white text-stone-800">
-      <header className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b border-stone-200/30">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-<img 
-  src="/logo.png" 
-  alt="Swipe to Dance" 
-  className="h-8 md:h-10"
-/>
+    <div className={`min-h-screen ${darkMode ? "bg-[#0D0D0D] text-stone-100" : "bg-white text-stone-800"}`}>
+      <header className={`sticky top-0 z-10 backdrop-blur border-b ${darkMode ? "bg-[#0D0D0D] border-[#2A2A2A]" : "bg-white/80 border-stone-200/30"}`}>
+        <div className="max-w-sm mx-auto px-4 py-3 flex items-center gap-3">
+          <img src="/logo.png" alt="SwipeDJ" className="h-8 w-auto" />
 
-  {/* Mobile buttons (visible on small screens) */}
-  <div className="ml-auto md:hidden flex flex-wrap items-center justify-end gap-1.5">
-    {/* Connect to Spotify (mobile) */}
-    <button
-  type="button"
-  onClick={() => {
-    if (!spUser) {
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      if (isSafari) {
-        alert('⚠️ Note: If using Safari Private Mode, you may need to click "Connect" twice.\n\nTip: Use standard browsing mode for best results.');
-      }
-      spotifyLogin();
-    }
-  }}
-  disabled={!!spUser}
-  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-light transition-colors ${
-    spUser
-      ? "bg-emerald-100 text-emerald-800 cursor-default"
-      : "bg-emerald-600 text-white hover:bg-emerald-500"
-  }`}
->
-  {spUser ? "✓" : "Spotify"}
-</button>
-
-    {/* Export (mobile) */}
-    <div className="relative" ref={mobileExportMenuRef}>
-      <button
-        onClick={() => setMobileExportOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
-        disabled={!songs.length}
-      >
-        <Download size={12} /> Export
-      </button>
-
-      {mobileExportOpen && (
-        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-            onClick={() => {
-              exportPlaylist();
-              setMobileExportOpen(false);
+          {/* Hidden file input — used by drawer upload actions */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.json,.jsonl,.ndjson"
+            className="hidden"
+            onChange={(e) => {
+              handleFiles(e.target.files?.[0], pendingUploadModeRef.current);
+              e.target.value = "";
             }}
-          >
-            Export playlist (CSV)
-          </button>
+          />
 
-          <button
-            className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-            onClick={() => {
-              requirePro(() => {
-                void handleExportToSpotify();
-              });
-              setMobileExportOpen(false);
-            }}
-            disabled={spBusy}
-          >
-            <span className="text-left">
-              Export to Spotify <span className="text-rose-700/70">(Pro)</span>
-            </span>
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Done */}
+            <button
+              type="button"
+              onClick={() => setShowExport(true)}
+              className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#E8502A] text-white text-sm font-bold hover:bg-[#C43E1F] transition-colors"
+            >
+              Done
+            </button>
 
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-            onClick={() => {
-              exportBuckets();
-              setMobileExportOpen(false);
-            }}
-          >
-            Export all buckets (3 CSVs)
-          </button>
-        </div>
-      )}
-    </div>
-
-    {/* Reset (mobile) */}
-    <button
-      onClick={resetAll}
-      className="inline-flex items-center px-2 py-1 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-xs font-light hover:bg-rose-50 transition-colors"
-    >
-      Reset
-    </button>
-  </div>
-
-  {/* RIGHT SIDE (desktop toolbar) */}
-  <div className="ml-auto hidden md:flex items-center gap-2">
-  {/* Upload (menu) */}
-  <div className="relative" ref={uploadMenuRef}>
-    <button
-      type="button"
-      onClick={() => setUploadOpen(v => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors"
-    >
-      <Upload size={16} /> Upload your own songs <span className="text-rose-700/70">(Pro)</span>
-    </button>
-
-    {uploadOpen && (
-      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAdd}>
-          Add to existing songs <span className="text-pink-700/70">(Pro)</span>
-        </button>
-        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplace}>
-          Replace songs <span className="text-pink-700/70">(Pro)</span>
-        </button>
-      </div>
-    )}
-  </div>
-
-  <input
-    ref={fileInputRef}
-    type="file"
-    accept=".csv,.json,.jsonl,.ndjson"
-    className="hidden"
-     onChange={(e) => {
-    handleFiles(e.target.files?.[0], pendingUploadModeRef.current);
-    e.target.value = '';
-  }}
-  />
-
-{/* Connect to Spotify (single button) */}
-<button
-  type="button"
-  onClick={() => {
-    if (!spUser) {
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      if (isSafari) {
-        alert('⚠️ Note: If using Safari Private Mode, you may need to click "Connect" twice.\n\nTip: Use standard browsing mode for best results.');
-      }
-      spotifyLogin();
-    }
-  }}
-  disabled={!!spUser}
-  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-light transition-colors ${
-    spUser
-      ? "bg-emerald-100 text-emerald-800 cursor-default"
-      : "bg-emerald-600 text-white hover:bg-emerald-500"
-  }`}
->
-  {spUser ? "Spotify connected" : "Connect to Spotify"}
-</button>
-
-  {/* Export */}
-  <div className="relative" ref={exportMenuRef}>
-    <button
-      type="button"
-      onClick={() => setExportOpen(v => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 disabled:opacity-50 transition-colors"
-      disabled={!songs.length}
-    >
-      <Download size={16} /> Export
-    </button>
-
-    {exportOpen && (
-      <div className="absolute right-0 mt-2 w-64 rounded-xl border border-pink-200 bg-white shadow-lg overflow-hidden z-20">
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => { exportPlaylist(); setExportOpen(false); }}
-        >
-          Export playlist (CSV)
-        </button>
-
-        <button
-          className="w-full px-3 py-2 text-sm hover:bg-rose-50 disabled:opacity-50 flex items-center justify-between"
-          onClick={() => { requirePro(() => { void handleExportToSpotify(); }); setExportOpen(false); }}
-          disabled={spBusy}
-        >
-          <span className="text-left">
-            Export to Spotify <span className="text-pink-700/70">(Pro)</span> {spBusy ? "…" : ""}
-          </span>
-          <span className="ml-2 inline-flex items-center gap-1 text-xs">
-            <span className={`w-2 h-2 rounded-full ${spUser ? "bg-emerald-500" : "bg-slate-300"}`} />
-            <span className={spUser ? "text-emerald-700" : "text-slate-500"}>
-              {spUser ? "connected" : "not connected"}
-            </span>
-          </span>
-        </button>
-
-        <button
-          className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50"
-          onClick={() => { exportBuckets(); setExportOpen(false); }}
-        >
-          Export all buckets (3 CSVs)
-        </button>
-      </div>
-    )}
-  </div>
-
-  <button
-    type="button"
-    onClick={resetAll}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent border border-rose-200 text-rose-700 text-sm font-light hover:bg-rose-50 transition-colors"
-  >
-    Reset
-  </button>
-</div>
-
+            {/* Gear / settings */}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Settings"
+              className={`inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                darkMode
+                  ? "text-stone-300 hover:bg-[#2A2A2A]"
+                  : "text-stone-500 hover:bg-stone-100"
+              }`}
+            >
+              <Settings size={20} />
+            </button>
+          </div>
         </div>
 
-<div className="h-0.5 w-full bg-rose-100">
+<div className="max-w-sm mx-auto h-0.5 bg-[#FFE8E0]">
   <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
 </div>
 
         {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-2">
+      {/* ── Settings drawer ─────────────────────────────── */}
+      {drawerOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 z-40 bg-black/50"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Panel */}
+          <div className={`fixed top-0 right-0 h-full w-72 z-50 flex flex-col shadow-2xl ${
+            darkMode ? "bg-[#1A1A1A] text-stone-100" : "bg-white text-stone-800"
+          }`}>
+            {/* Drawer header */}
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${
+              darkMode ? "border-[#2A2A2A]" : "border-stone-100"
+            }`}>
+              <span className="font-bold text-base">Settings</span>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close settings"
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                  darkMode ? "hover:bg-[#2A2A2A] text-stone-400" : "hover:bg-stone-100 text-stone-500"
+                }`}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Drawer body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+
+              {/* Upload — Add */}
+              <button
+                type="button"
+                onClick={triggerUploadAdd}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
+                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
+                }`}
+              >
+                <Upload size={16} className="text-[#E8502A] flex-shrink-0" />
+                <span>Upload songs <span className="text-xs font-normal opacity-50 ml-1">add to list</span></span>
+              </button>
+
+              {/* Upload — Replace */}
+              <button
+                type="button"
+                onClick={triggerUploadReplace}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
+                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
+                }`}
+              >
+                <Upload size={16} className="text-[#E8502A] flex-shrink-0" />
+                <span>Replace song list</span>
+              </button>
+
+              <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+
+              {/* Reset session */}
+              <button
+                type="button"
+                onClick={() => { setDrawerOpen(false); resetAll(); }}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
+                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
+                }`}
+              >
+                <RotateCcw size={16} className="text-stone-400 flex-shrink-0" />
+                Reset session
+              </button>
+
+              <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+
+              {/* Dark / light toggle */}
+              <div className={`flex items-center justify-between px-3 py-3 rounded-xl ${
+                darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
+              }`}>
+                <span className="text-sm font-semibold">
+                  {darkMode ? "Dark mode" : "Light mode"}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={darkMode}
+                  onClick={() => setDarkMode(v => !v)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                    darkMode ? "bg-[#E8502A]" : "bg-stone-300"
+                  }`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    darkMode ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+
+              {/* Spotify status */}
+              <div className={`flex items-center justify-between px-3 py-3 rounded-xl ${
+                darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
+              }`}>
+                <span className="text-sm font-semibold">Spotify</span>
+                {spUser ? (
+                  <span className="text-xs text-emerald-600 font-semibold">Connected ✓</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                      if (isSafari) alert('⚠️ Note: If using Safari Private Mode, you may need to click "Connect" twice.');
+                      spotifyLogin();
+                    }}
+                    className="text-xs font-bold text-[#E8502A] hover:underline"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+
+              {/* Upgrade to Pro */}
+              {!proUnlocked && (
+                <>
+                  <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+                  <button
+                    type="button"
+                    onClick={() => { setDrawerOpen(false); setPayOpen(true); }}
+                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-gradient-to-r from-[#E8502A] to-[#D4A017] text-white text-sm font-bold transition-opacity hover:opacity-90"
+                  >
+                    <span>Upgrade to Pro</span>
+                    <span className="text-xs font-normal opacity-80">$9.99 one-time</span>
+                  </button>
+                </>
+              )}
+
+              {proUnlocked && (
+                <p className="px-3 text-xs text-[#D4A017] font-semibold">★ Pro unlocked</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <main className="max-w-sm mx-auto px-0 py-2">
         {!songs.length ? (
           <div className="grid place-items-center text-center py-24">
             <div className="max-w-xl">
@@ -1199,7 +1172,7 @@ useEffect(() => {
           <div className="space-y-6">
             {/* swipe card */}
             <section {...swipeHandlers} className="select-none touch-none overscroll-contain">
-              <div className="relative mx-auto w-full max-w-md md:max-w-lg">
+              <div className="relative mx-auto w-full">
                 {/* next card preview */}
                 {nextSong && (
                   <div
@@ -1214,12 +1187,12 @@ useEffect(() => {
                     <div
                       className={`relative rounded-3xl ${themeNext.bg} shadow-xl border ${themeNext.border} p-6 md:p-8 min-h-[360px] md:min-h-[480px] flex flex-col justify-between`}
                     >
-                      <div className="text-sm font-light text-stone-400">
+                      <div className="text-sm font-normal text-stone-400">
                         Song {Math.min(index + 2, songs.length)} of {songs.length} • Remaining {Math.max(remaining - 1, 0)}
                       </div>
 
                       <div className="text-center py-2">
-                        <div className="text-2xl font-light tracking-wide text-stone-800">{nextSong.title}</div>
+                        <div className="text-2xl font-normal tracking-wide text-stone-800">{nextSong.title}</div>
 
                         {nextSong.__art ? (
                           <img
@@ -1231,7 +1204,7 @@ useEffect(() => {
                           />
                         ) : null}
 
-                        {nextSong.artist ? <div className="text-base font-light text-stone-500 mt-3">{nextSong.artist}</div> : null}
+                        {nextSong.artist ? <div className="text-base font-normal text-stone-500 mt-3">{nextSong.artist}</div> : null}
 
                         <div className="mt-4 flex justify-center gap-3 text-xs text-slate-500">
                           {nextSong.genre ? <span className="px-2 py-1 rounded-full bg-slate-100">{nextSong.genre}</span> : null}
@@ -1247,7 +1220,7 @@ useEffect(() => {
                         <button aria-hidden="true" disabled className="p-4 rounded-2xl bg-red-100 text-red-700">
                           <X size={28} />
                         </button>
-                        <button aria-hidden="true" disabled className="p-5 rounded-2xl bg-emerald-600 text-white">
+                        <button aria-hidden="true" disabled className="p-5 rounded-2xl bg-[#C43E1F] text-white">
                           <Check size={30} />
                         </button>
                         <button aria-hidden="true" disabled className="p-4 rounded-2xl bg-yellow-100 text-yellow-800">
@@ -1268,10 +1241,7 @@ useEffect(() => {
                 {/* current card */}
                 <div
                   key={current ? current.__id : "empty"}
-                  className={`relative rounded-3xl ${theme.bg} shadow-xl hover:shadow-2xl hover:shadow-rose-100 transition-shadow border ${theme.border} p-6 md:p-8 min-h[420px] md:min-h-[480px] flex flex-col justify-between`.replace(
-                    "min-h[360px]",
-                    "min-h-[360px]"
-                  )}
+                  className={`relative rounded-3xl transition-shadow px-6 md:px-8 pt-3 pb-3 min-h-[480px] flex flex-col justify-between ${darkMode ? "bg-[#1A1A1A] border border-[#2A2A2A] shadow-[0_0_30px_rgba(232,80,42,0.15)]" : "bg-[#FFE8E0] shadow-lg border border-[#FFD0C0]"}`}
                   style={{
                     transform:
                       fling.active && current && fling.id === current.__id
@@ -1285,13 +1255,13 @@ useEffect(() => {
                         : "transform 220ms ease-out",
                   }}
                 >
-                  <div className="text-sm text-slate-500">
+                  <div className={`text-sm ${darkMode ? "text-gray-500" : "text-slate-500"}`}>
                     Song {Math.min(index + 1, songs.length)} of {songs.length} • Remaining {remaining}
                   </div>
 
                   {current ? (
-                    <div className="text-center py-2">
-                      <div className="text-3xl font-bold tracking-tight">{current.title}</div>
+                    <div className="text-center py-1">
+                      <div className={`text-4xl font-black ${darkMode ? "text-white" : "text-[#1A1A1A]"}`}>{current.title}</div>
 
                       {current.__art ? (
                         <img
@@ -1299,44 +1269,91 @@ useEffect(() => {
                           crossOrigin="anonymous"
                           referrerPolicy="no-referrer"
                           alt={`${current.title} cover`}
-                          className="mx-auto mt-4 w-48 h-48 rounded-xl object-cover shadow"
+                          className="mx-auto mt-2 w-full max-w-[240px] aspect-square rounded-2xl object-cover shadow-md"
                           loading="lazy"
                         />
                       ) : null}
 
-                      {current.artist ? <div className="text-lg text-slate-600 mt-2">{current.artist}</div> : null}
+                      {current.artist ? <div className={`text-base font-semibold mt-1 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{current.artist}</div> : null}
 
                       {/* play snippet button under title/art */}
-                      <div className="mt-3 flex items-center justify-center">
+                      <div className="mt-2 w-full">
                         <button
                           aria-label="Preview"
                           onClick={togglePreview}
                           disabled={!current || fling.active}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-rose-200 bg-white/90 hover:bg-rose-50 text-sm font-light text-rose-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#E8502A] text-white font-bold transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8502A] focus-visible:ring-offset-2"
                         >
                           {previewing ? <Pause size={16} /> : <Play size={16} />}
                           <span>{previewing ? "Stop snippet" : previewPreparing ? "Preparing…" : "Play snippet"}</span>
                         </button>
                       </div>
 
-                      <div className="mt-4 flex justify-center gap-3 text-xs text-slate-500">
+                      <div className="mt-2 flex justify-center gap-3 text-xs">
                         {current.genre ? (
-                          <span className="px-3 py-1 rounded-full bg-stone-100/50 text-xs font-light text-stone-500">{current.genre}</span>
+                          <span className="px-3 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.genre}</span>
                         ) : null}
-                        {current.decade ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.decade}</span> : null}
-                        {current.bpm ? <span className="px-2 py-1 rounded-full bg-slate-100">{current.bpm} BPM</span> : null}
+                        {current.decade ? <span className="px-2 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.decade}</span> : null}
+                        {current.bpm ? <span className="px-2 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.bpm} BPM</span> : null}
+                      </div>
+
+                      {/* action buttons — inside card */}
+                      <div className="pt-2 pb-3 flex flex-col items-center gap-2">
+                        <div className="flex items-center justify-center gap-4">
+                          <button
+                            aria-label="Undo"
+                            onClick={onUndo}
+                            disabled={fling.active}
+                            className={`w-10 h-10 rounded-full text-gray-400 flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                          >
+                            <RotateCcw size={18} />
+                          </button>
+                          <button
+                            aria-label="No"
+                            onClick={onNo}
+                            disabled={fling.active}
+                            className={`w-10 h-10 rounded-full text-[#E8502A] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                          >
+                            <X size={18} />
+                          </button>
+                          <button
+                            aria-label="Yes"
+                            onClick={onYes}
+                            disabled={fling.active}
+                            className="w-14 h-14 rounded-full bg-[#E8502A] text-white flex items-center justify-center transition-colors"
+                          >
+                            <Check size={22} />
+                          </button>
+                          <button
+                            aria-label="Star"
+                            onClick={onStar}
+                            disabled={fling.active}
+                            className={`w-10 h-10 rounded-full text-[#D4A017] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                          >
+                            <Star size={18} />
+                          </button>
+                          <button
+                            aria-label="Skip"
+                            onClick={onSkip}
+                            disabled={fling.active}
+                            className={`w-10 h-10 rounded-full text-[#D4A017] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                          >
+                            <SkipForward size={18} />
+                          </button>
+                        </div>
+                        <p className={`text-xs text-center ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Swipe left to pass, swipe right to add</p>
                       </div>
 
                       {/* overlays */}
                       <div className="pointer-events-none">
                         <div
-                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-light"
+                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-normal"
                           style={{ opacity: yesOpacity }}
                         >
                           ✓ Yes
                         </div>
                         <div
-                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-light"
+                          className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-normal"
                           style={{ opacity: noOpacity }}
                         >
                           ✕ No
@@ -1362,80 +1379,10 @@ useEffect(() => {
                     </div>
                   )}
 
-                  {/* controls */}
-                  <div className="flex items-center justify-center gap-3 pt-1">
-                    <button
-                      aria-label="Undo"
-                      onClick={onUndo}
-                      disabled={fling.active}
-                      className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                    >
-                      <RotateCcw />
-                    </button>
-                    <button
-                      aria-label="No"
-                      onClick={onNo}
-                      disabled={fling.active}
-                      className="p-4 rounded-full bg-rose-100/50 text-rose-600 hover:bg-rose-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                    >
-                      <X size={28} />
-                    </button>
-                    <button
-                      aria-label="Yes"
-                      onClick={onYes}
-                      disabled={fling.active}
-                      className="p-5 rounded-full bg-green-100/60 text-green-700 hover:bg-green-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                    >
-                      <Check size={30} />
-                    </button>
-                    <button
-                      aria-label="Star"
-                      onClick={onStar}
-                      disabled={fling.active}
-                      className="p-4 rounded-full bg-yellow-50/60 text-yellow-700 hover:bg-yellow-100/60 transition-colors"
-                    >
-                      <Star size={26} />
-                    </button>
-                    <button
-                      aria-label="Skip"
-                      onClick={onSkip}
-                      disabled={fling.active}
-                      className="p-3 rounded-full border border-rose-200/50 bg-white hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                    >
-                      <SkipForward />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 text-center text-xs text-slate-500">
-                    Left swipe = No. Right swipe or Space = Yes. Up swipe or S = Star. Down swipe = Skip.
-                  </div>
                 </div>
               </div>
             </section>
 
-           {/* Mobile controls under the card - just Upload */}
-<div className="md:hidden mt-4 flex items-center justify-center">
-  {/* Upload (mobile) */}
-  <div className="relative" ref={mobileUploadMenuRef}>
-    <button
-      onClick={() => setMobileUploadOpen((v) => !v)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-100 text-rose-700 text-sm font-light hover:bg-rose-200 transition-colors"
-    >
-      <Upload size={16} /> Upload <span className="text-rose-700/70">(Pro)</span>
-    </button>
-
-    {mobileUploadOpen && (
-      <div className="absolute left-0 mt-2 w-64 rounded-xl border border-rose-200 bg-white shadow-lg overflow-hidden z-20">
-        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadAddMobile}>
-          Add to existing songs <span className="text-rose-700/70">(Pro)</span>
-        </button>
-        <button className="w-full text-left px-3 py-2 text-sm hover:bg-rose-50" onClick={triggerUploadReplaceMobile}>
-          Replace songs <span className="text-rose-700/70">(Pro)</span>
-        </button>
-      </div>
-    )}
-  </div>
-</div>
 
             {/* sidebar under the card (stacked layout) */}
             <aside className="space-y-4">
@@ -1501,7 +1448,7 @@ useEffect(() => {
             <p className="mt-1 text-sm text-slate-600">
               Pro lets you <strong>upload your own songs</strong> and <strong>export to Spotify</strong>.
             </p>
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-pink-100 bg-rose-50/60 p-3">
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-pink-100 bg-[#FFE8E0]/60 p-3">
               <div>
                 <div className="text-sm font-medium text-pink-900">One-time purchase</div>
                 <div className="text-xs text-pink-800/80">Lifetime access</div>
@@ -1533,7 +1480,7 @@ useEffect(() => {
 function Panel({ title, children }) {
   return (
     <div className="rounded-xl bg-white border border-rose-200 shadow-none">
-      <div className="px-5 py-3 border-b border-rose-100 bg-rose-50/60 text-rose-800 font-medium rounded-t-xl">{title}</div>
+      <div className="px-5 py-3 border-b border-rose-100 bg-[#FFE8E0]/60 text-rose-800 font-medium rounded-t-xl">{title}</div>
       <div className="p-4">{children}</div>
     </div>
   );
@@ -1541,7 +1488,7 @@ function Panel({ title, children }) {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-lg bg-rose-50 border border-rose-100 p-4">
+    <div className="rounded-lg bg-[#FFE8E0] border border-rose-100 p-4">
       <div className="text-2xl font-semibold text-rose-900">{value}</div>
       <div className="text-xs text-rose-700/80">{label}</div>
     </div>
