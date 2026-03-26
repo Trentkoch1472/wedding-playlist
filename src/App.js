@@ -344,7 +344,6 @@ const startCheckout = useCallback(async () => {
     { bg: "bg-[#FFE8E0]", border: "border-rose-200" },
     { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" },
   ];
-  const theme = themes[index % 2];
   const themeNext = themes[(index + 1) % 2];
 
   const current = songs[index] || null;
@@ -874,13 +873,6 @@ useEffect(() => {
   );
 
   // 2) Buckets export (3 CSVs)
-  const exportBuckets = () => {
-    const toCSV = (arr) => Papa.unparse(arr.map((s) => ({ title: s.title, artist: s.artist })));
-    download("must-haves.csv", toCSV(starList));
-    download("approved.csv", toCSV(yesList.filter((s) => !starList.includes(s))));
-    download("no-thanks.csv", toCSV(noList));
-    maybeOfferCoffee();
-  };
 
   const resetAll = () => {
   stopPreview();
