@@ -9,7 +9,6 @@ import {
   Check,
   Star,
   Upload,
-  Download,
   RotateCcw,
   SkipForward,
   Play,
@@ -112,36 +111,6 @@ export default function App() {
   // Spotify must always send users back to ONE exact URL
   const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
 
-  // Detect Safari private mode
-  const [isPrivateMode, setIsPrivateMode] = useState(false);
-
-  useEffect(() => {
-    // Check if in Safari private mode
-    const checkPrivateMode = async () => {
-      try {
-        // Safari private mode blocks localStorage/indexedDB
-        if (!window.indexedDB) {
-          setIsPrivateMode(true);
-          return;
-        }
-        
-        // Additional check for iOS Safari
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        if (isSafari) {
-          try {
-            localStorage.setItem('test', 'test');
-            localStorage.removeItem('test');
-          } catch (e) {
-            setIsPrivateMode(true);
-          }
-        }
-      } catch (e) {
-        // Probably in private mode
-      }
-    };
-    
-    checkPrivateMode();
-  }, []);
 
   const {
     user: spUser,
@@ -234,21 +203,6 @@ useEffect(() => {
   }
 }, [spUser, spotifyLogin]);
 
-// One handler to ensure we start on the redirect origin
-const connectToSpotify = useCallback(() => {
-  const currentOrigin = window.location.origin;
-  const redirectOrigin = new URL(SPOTIFY_REDIRECT_URI).origin;
-
-  if (currentOrigin !== redirectOrigin) {
-    // hop to the redirect site and tell it to auto-start login
-    const u = new URL(SPOTIFY_REDIRECT_URI);
-    u.searchParams.set("connect", "1");
-    window.location.assign(u.toString());
-  } else {
-    // already on the right origin — start now
-    spotifyLogin();
-  }
-}, [SPOTIFY_REDIRECT_URI, spotifyLogin]);
 
   // Local storage state
   function useLocalState(key, initial) {
@@ -303,16 +257,6 @@ const defaultSongsRef = useRef(null);
     [proUnlocked]
   );
 
-  const unlockPro = useCallback(() => {
-    setProUnlocked(true);
-    setPayOpen(false);
-    showToast('🎉 Pro features unlocked!', 'success');
-    if (typeof pendingActionRef.current === "function") {
-      const run = pendingActionRef.current;
-      pendingActionRef.current = null;
-      setTimeout(() => run(), 50);
-    }
-  }, [setProUnlocked]);
 
   const cancelPay = useCallback(() => {
     pendingActionRef.current = null;
