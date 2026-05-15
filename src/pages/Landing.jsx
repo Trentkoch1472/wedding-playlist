@@ -168,13 +168,13 @@ export default function Landing() {
               <span className="swipe-label" style={{ right: '-22px' }}>Add</span>
 
               <article className="swipe-card">
-                <div className="card-art" ref={cardArtRef}>
-                  <span className="card-tag" ref={cardTagRef}>First Dance</span>
+                <div className="card-art" ref={cardArtRef} style={{ background: TRACKS[0].art }}>
+                  <span className="card-tag" ref={cardTagRef}>{TRACKS[0].tag}</span>
                 </div>
                 <div className="card-meta">
                   <div className="card-meta-text">
-                    <h3 className="card-title" ref={cardTitleRef}>Glass Ceiling</h3>
-                    <p className="card-artist" ref={cardArtistRef}>Lena Marigold · Lantern Year</p>
+                    <h3 className="card-title" ref={cardTitleRef}>{TRACKS[0].title}</h3>
+                    <p className="card-artist" ref={cardArtistRef}>{TRACKS[0].artist}</p>
                   </div>
                   <button className="card-play" aria-label="Play preview">
                     <svg viewBox="0 0 14 14" fill="currentColor"><path d="M2 1.5v11l10-5.5z"/></svg>
