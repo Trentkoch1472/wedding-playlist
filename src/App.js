@@ -4,6 +4,7 @@ import ExportScreen from "./ExportScreen";
 import { useSwipeable } from "react-swipeable";
 import Papa from "papaparse";
 import useSpotify from "./useSpotify";
+import { supabase } from "./lib/supabase";
 import {
   X,
   Check,
@@ -109,7 +110,7 @@ function shuffle(arr) {
 /* ========== App ========== */
 export default function App() {
   // Spotify must always send users back to ONE exact URL
-  const SPOTIFY_REDIRECT_URI = "https://swipetodance.trentkoch.com/callback";
+  const SPOTIFY_REDIRECT_URI = "https://swipedj.app/callback";
 
 
   const {
@@ -128,11 +129,14 @@ export default function App() {
 
   const pendingUploadModeRef = useRef("replace"); // "add" | "replace"
 
+  // Bottom tab navigation
+  const [activeTab, setActiveTab] = useState('swipe');
+
   // Settings drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Dark mode
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   // Export screen
   const [showExport, setShowExport] = useState(false);
@@ -242,6 +246,10 @@ const defaultSongsRef = useRef(null);
 
   // --- Pro gating ---
   const [proUnlocked, setProUnlocked] = useLocalState("wps_pro", false);
+  const [hasSwipedOnce, setHasSwipedOnce] = useLocalState("wps_hasSwipedOnce", false);
+  const [hintFading, setHintFading] = useState(false);
+  const hasSwipedOnceRef = useRef(hasSwipedOnce);
+  const clientIdRef = useRef(localStorage.getItem('swipedj_client_id'));
   const [payOpen, setPayOpen] = useState(false);
   const pendingActionRef = useRef(null);
 
@@ -285,8 +293,8 @@ const startCheckout = useCallback(async () => {
 
   // Theme for cards
   const themes = [
-    { bg: "bg-[#FFE8E0]", border: "border-rose-200" },
-    { bg: "bg-[#FAFAF7]", border: "border-[#EAEAEA]" },
+    { bg: "bg-white", border: "border-stone-100" },
+    { bg: "bg-[#fafafa]", border: "border-stone-100" },
   ];
   const themeNext = themes[(index + 1) % 2];
 
@@ -341,6 +349,38 @@ const startCheckout = useCallback(async () => {
       }
     })();
   }, [showToast, setProUnlocked]);
+
+  // Resolve DJ invite token → client ID on first load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("client");
+    if (!token) return;
+
+    // If we already have a stored client ID for this token, skip the lookup
+    if (clientIdRef.current) return;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('invite_token', token)
+        .single();
+
+      if (error || !data) {
+        console.warn('Invite token lookup failed:', error?.message);
+        return;
+      }
+
+      localStorage.setItem('swipedj_client_id', data.id);
+      clientIdRef.current = data.id;
+
+      // Clean token from URL without triggering a reload
+      params.delete("client");
+      const qs = params.toString();
+      const clean = window.location.pathname + (qs ? `?${qs}` : "");
+      window.history.replaceState({}, document.title, clean);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derived lists
   const yesList = useMemo(
@@ -585,10 +625,18 @@ for (const q of attempts) {
     }
   }, [current, nextSong, ensureMeta]);
 
+  // Keep ref in sync so flingAndCommit can read it without being in deps
+  hasSwipedOnceRef.current = hasSwipedOnce;
+
   /* ---- swipe logic ---- */
   const flingAndCommit = useCallback(
     (status, dir) => {
       if (!current || fling.active) return;
+
+      if (!hasSwipedOnceRef.current) {
+        setHintFading(true);
+        window.setTimeout(() => setHasSwipedOnce(true), 600);
+      }
 
       const OFF_X = Math.max(window.innerWidth, 800) * 1.2;
       const OFF_Y = Math.max(window.innerHeight, 600) * 1.2;
@@ -618,6 +666,23 @@ for (const q of attempts) {
         } else {
           setChoices((c) => ({ ...c, [current.__id]: { status } }));
           setIndex((i) => Math.min(i + 1, songs.length));
+
+          // Write swipes to Supabase if arriving from a DJ invite link
+          if (clientIdRef.current && (status === "yes" || status === "no" || status === "star")) {
+            const decision = status === "star" ? "must_have" : status;
+            supabase.from('client_songs').insert({
+              client_id: clientIdRef.current,
+              spotify_track_id: current.__spotify_id ?? null,
+              title: current.title,
+              artist: current.artist ?? null,
+              album: current.album ?? null,
+              album_art_url: current.__art ?? null,
+              moment: null,
+              decision,
+            }).then(({ error }) => {
+              if (error) console.warn('client_songs insert failed:', error.message);
+            });
+          }
         }
         setFling({ active: false, toX: 0, toY: 0, rotate: 0, id: null });
         setDrag({ dx: 0, dy: 0, active: false });
@@ -895,10 +960,13 @@ useEffect(() => {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-[#0D0D0D] text-stone-100" : "bg-white text-stone-800"}`}>
-      <header className={`sticky top-0 z-10 backdrop-blur border-b ${darkMode ? "bg-[#0D0D0D] border-[#2A2A2A]" : "bg-white/80 border-stone-200/30"}`}>
+    <div
+      className="bg-[#0D0D0D] text-stone-100"
+      style={{ height: '100dvh', display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top)', overflow: 'hidden' }}
+    >
+      <header className="sticky top-0 z-10 backdrop-blur border-b bg-[#0D0D0D] border-[#2A2A2A]">
         <div className="max-w-sm mx-auto px-4 py-3 flex items-center gap-3">
-          <img src="/logo.png" alt="SwipeDJ" className="h-8 w-auto" />
+          <img src="/swipeDJ logo.svg" alt="SwipeDJ" className="h-8 w-auto" />
 
           {/* Hidden file input — used by drawer upload actions */}
           <input
@@ -917,7 +985,11 @@ useEffect(() => {
             <button
               type="button"
               onClick={() => setShowExport(true)}
-              className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#E8502A] text-white text-sm font-bold hover:bg-[#C43E1F] transition-colors"
+              className={`inline-flex items-center px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors ${
+                darkMode
+                  ? "border-[#E8502A] text-[#E8502A] hover:bg-[#E8502A]/10"
+                  : "border-[#E8502A] text-[#E8502A] hover:bg-[#E8502A]/10"
+              }`}
             >
               Done
             </button>
@@ -927,22 +999,18 @@ useEffect(() => {
               type="button"
               onClick={() => setDrawerOpen(true)}
               aria-label="Settings"
-              className={`inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
-                darkMode
-                  ? "text-stone-300 hover:bg-[#2A2A2A]"
-                  : "text-stone-500 hover:bg-stone-100"
-              }`}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors text-stone-300 hover:bg-[#2A2A2A]"
             >
               <Settings size={20} />
             </button>
           </div>
         </div>
 
-<div className="max-w-sm mx-auto h-0.5 bg-[#FFE8E0]">
-  <div className="h-full bg-rose-400" style={{ width: `${progress * 100}%` }} />
+<div className="max-w-sm mx-auto h-0.5 bg-[#2A2A2A]">
+  <div className="h-full bg-[#E8502A]" style={{ width: `${progress * 100}%` }} />
 </div>
 
-        {spMsg ? <div className="text-xs text-pink-700/70 text-center py-1">{spMsg}</div> : null}
+        {spMsg ? <div className="text-xs text-center py-1" style={{ color: '#888888' }}>{spMsg}</div> : null}
       </header>
 
       {/* ── Settings drawer ─────────────────────────────── */}
@@ -956,21 +1024,18 @@ useEffect(() => {
           />
 
           {/* Panel */}
-          <div className={`fixed top-0 right-0 h-full w-72 z-50 flex flex-col shadow-2xl ${
-            darkMode ? "bg-[#1A1A1A] text-stone-100" : "bg-white text-stone-800"
-          }`}>
+          <div className="fixed top-0 right-0 h-full w-72 z-50 flex flex-col shadow-2xl bg-[#1A1A1A] text-stone-100">
             {/* Drawer header */}
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${
-              darkMode ? "border-[#2A2A2A]" : "border-stone-100"
-            }`}>
+            <div
+              className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]"
+              style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}
+            >
               <span className="font-bold text-base">Settings</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Close settings"
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-                  darkMode ? "hover:bg-[#2A2A2A] text-stone-400" : "hover:bg-stone-100 text-stone-500"
-                }`}
+                className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:bg-[#2A2A2A] text-stone-400"
               >
                 <X size={18} />
               </button>
@@ -983,9 +1048,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={triggerUploadAdd}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
-                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
-                }`}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors hover:bg-[#2A2A2A]"
               >
                 <Upload size={16} className="text-[#E8502A] flex-shrink-0" />
                 <span>Upload songs <span className="text-xs font-normal opacity-50 ml-1">add to list</span></span>
@@ -995,44 +1058,36 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={triggerUploadReplace}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
-                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
-                }`}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors hover:bg-[#2A2A2A]"
               >
                 <Upload size={16} className="text-[#E8502A] flex-shrink-0" />
                 <span>Replace song list</span>
               </button>
 
-              <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+              <div className="my-2 h-px bg-[#2A2A2A]" />
 
               {/* Reset session */}
               <button
                 type="button"
                 onClick={() => { setDrawerOpen(false); resetAll(); }}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors ${
-                  darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
-                }`}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-left transition-colors hover:bg-[#2A2A2A]"
               >
                 <RotateCcw size={16} className="text-stone-400 flex-shrink-0" />
                 Reset session
               </button>
 
-              <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+              <div className="my-2 h-px bg-[#2A2A2A]" />
 
               {/* Dark / light toggle */}
-              <div className={`flex items-center justify-between px-3 py-3 rounded-xl ${
-                darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
-              }`}>
-                <span className="text-sm font-semibold">
-                  {darkMode ? "Dark mode" : "Light mode"}
-                </span>
+              <div className="flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[#2A2A2A]">
+                <span className="text-sm font-semibold">Dark mode</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={darkMode}
                   onClick={() => setDarkMode(v => !v)}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-                    darkMode ? "bg-[#E8502A]" : "bg-stone-300"
+                    darkMode ? "bg-[#E8502A]" : "bg-stone-600"
                   }`}
                 >
                   <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
@@ -1042,12 +1097,10 @@ useEffect(() => {
               </div>
 
               {/* Spotify status */}
-              <div className={`flex items-center justify-between px-3 py-3 rounded-xl ${
-                darkMode ? "hover:bg-[#2A2A2A]" : "hover:bg-stone-50"
-              }`}>
+              <div className="flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[#2A2A2A]">
                 <span className="text-sm font-semibold">Spotify</span>
                 {spUser ? (
-                  <span className="text-xs text-emerald-600 font-semibold">Connected ✓</span>
+                  <span className="text-xs text-emerald-400 font-semibold">Connected ✓</span>
                 ) : (
                   <button
                     type="button"
@@ -1067,7 +1120,7 @@ useEffect(() => {
               {/* Upgrade to Pro */}
               {!proUnlocked && (
                 <>
-                  <div className={`my-2 h-px ${darkMode ? "bg-[#2A2A2A]" : "bg-stone-100"}`} />
+                  <div className="my-2 h-px bg-[#2A2A2A]" />
                   <button
                     type="button"
                     onClick={() => { setDrawerOpen(false); setPayOpen(true); }}
@@ -1087,28 +1140,55 @@ useEffect(() => {
         </>
       )}
 
-      <main className="max-w-sm mx-auto px-0 py-2">
-        {!songs.length ? (
-          <div className="grid place-items-center text-center py-24">
-            <div className="max-w-xl">
+      {/* ── Tab content area ─────────────────────────────── */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+
+        {/* ── Swipe tab ── */}
+        <div
+          style={{
+            position: 'absolute', inset: 0,
+            display: activeTab === 'swipe' ? 'flex' : 'none',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {!songs.length ? (
+            <div className="text-center px-8">
               <h2 className="text-2xl font-semibold mb-2">Import your song list</h2>
-              <p className="text-slate-600 mb-6">
-                Accepted formats: CSV or JSONL. Include at least a title field, artist is optional. Duplicate titles and artists will be
-                auto merged.
+              <p className="text-gray-400 mb-6">
+                Accepted formats: CSV or JSONL. Include at least a title field, artist is optional.
               </p>
               <button
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-pink-200 text-pink-900 hover:bg-pink-300"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#E8502A] text-white hover:bg-[#C43E1F]"
                 onClick={triggerUploadReplace}
               >
                 <Upload /> Upload your own songs
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
+          ) : (
+            <div style={{ width: '100%', maxWidth: '448px' }}>
             {/* swipe card */}
             <section {...swipeHandlers} className="select-none touch-none overscroll-contain">
               <div className="relative mx-auto w-full">
+                {/* Ambient blur — lives in the container, BEHIND the card */}
+                {current?.__art && (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      backgroundImage: `url(${toHttps(current.__art)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      filter: 'blur(42px)',
+                      opacity: 0.45,
+                      transform: 'scale(1.8)',
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+
                 {/* next card preview */}
                 {nextSong && (
                   <div
@@ -1121,7 +1201,7 @@ useEffect(() => {
                     }}
                   >
                     <div
-                      className={`relative rounded-3xl ${themeNext.bg} shadow-xl border ${themeNext.border} p-6 md:p-8 min-h-[360px] md:min-h-[480px] flex flex-col justify-between`}
+                      className={`relative rounded-[20px] ${themeNext.bg} shadow-[0_8px_32px_rgba(0,0,0,0.08)] border ${themeNext.border} p-6 md:p-8 min-h-[360px] md:min-h-[480px] flex flex-col justify-between mx-5`}
                     >
                       <div className="text-sm font-normal text-stone-400">
                         Song {Math.min(index + 2, songs.length)} of {songs.length} • Remaining {Math.max(remaining - 1, 0)}
@@ -1177,8 +1257,12 @@ useEffect(() => {
                 {/* current card */}
                 <div
                   key={current ? current.__id : "empty"}
-                  className={`relative rounded-3xl transition-shadow px-6 md:px-8 pt-3 pb-3 min-h-[480px] flex flex-col justify-between ${darkMode ? "bg-[#1A1A1A] border border-[#2A2A2A] shadow-[0_0_30px_rgba(232,80,42,0.15)]" : "bg-[#FFE8E0] shadow-lg border border-[#FFD0C0]"}`}
+                  className="relative rounded-[20px] transition-shadow px-6 md:px-8 pt-3 pb-4 flex flex-col mx-5"
                   style={{
+                    background: '#FFFFFF',
+                    boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+                    zIndex: 1,
+                    willChange: 'transform',
                     transform:
                       fling.active && current && fling.id === current.__id
                         ? `translate(${fling.toX}px, ${fling.toY}px) rotate(${fling.rotate}deg)`
@@ -1191,29 +1275,45 @@ useEffect(() => {
                         : "transform 220ms ease-out",
                   }}
                 >
-                  <div className={`text-sm ${darkMode ? "text-gray-500" : "text-slate-500"}`}>
+                  <div className="relative z-10 text-sm mb-3" style={{ color: '#888888' }}>
                     Song {Math.min(index + 1, songs.length)} of {songs.length} • Remaining {remaining}
                   </div>
 
                   {current ? (
-                    <div className="text-center py-1">
-                      <div className={`text-4xl font-black ${darkMode ? "text-white" : "text-[#1A1A1A]"}`}>{current.title}</div>
-
+                    <>
+                      {/* Album art — full card width, 260px tall */}
                       {current.__art ? (
                         <img
                           src={toHttps(current.__art)}
                           crossOrigin="anonymous"
                           referrerPolicy="no-referrer"
                           alt={`${current.title} cover`}
-                          className="mx-auto mt-2 w-full max-w-[240px] aspect-square rounded-2xl object-cover shadow-md"
-                          loading="lazy"
+                          draggable="false"
+                          className="relative z-10 w-full rounded-[16px] object-cover"
+                          style={{ height: '260px', imageRendering: 'high-quality', WebkitUserDrag: 'none', userSelect: 'none', pointerEvents: 'none' }}
                         />
                       ) : null}
 
-                      {current.artist ? <div className={`text-base font-semibold mt-1 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{current.artist}</div> : null}
+                      {/* Decade / genre tag — top-right corner of card interior */}
+                      {(current.decade || current.genre) && (
+                        <div className="absolute top-3 right-3 z-20 flex gap-1">
+                          {current.decade ? (
+                            <span style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: '999px', fontSize: '11px', fontWeight: 500, color: '#ffffff', padding: '3px 10px' }}>{current.decade}</span>
+                          ) : null}
+                          {current.genre ? (
+                            <span style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: '999px', fontSize: '11px', fontWeight: 500, color: '#ffffff', padding: '3px 10px' }}>{current.genre}</span>
+                          ) : null}
+                        </div>
+                      )}
 
-                      {/* play snippet button under title/art */}
-                      <div className="mt-2 w-full">
+                      {/* Title + Artist — below art */}
+                      <div className="relative z-10 text-center mt-4">
+                        <div className="text-2xl font-black leading-tight text-[#1A1A1A]">{current.title}</div>
+                        {current.artist ? <div className="text-base font-semibold mt-1 text-gray-500">{current.artist}</div> : null}
+                      </div>
+
+                      {/* Play snippet button */}
+                      <div className="relative z-10 mt-4 w-full">
                         <button
                           aria-label="Preview"
                           onClick={togglePreview}
@@ -1225,62 +1325,83 @@ useEffect(() => {
                         </button>
                       </div>
 
-                      <div className="mt-2 flex justify-center gap-3 text-xs">
-                        {current.genre ? (
-                          <span className="px-3 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.genre}</span>
-                        ) : null}
-                        {current.decade ? <span className="px-2 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.decade}</span> : null}
-                        {current.bpm ? <span className="px-2 py-1 rounded-full bg-white text-[#1A1A1A] text-xs font-semibold">{current.bpm} BPM</span> : null}
-                      </div>
+                      {/* BPM tag below play button if present */}
+                      {current.bpm ? (
+                        <div className="relative z-10 mt-2 flex justify-center">
+                          <span style={{ background: '#f0f0f0', borderRadius: '999px', fontSize: '12px', fontWeight: 500, color: '#666666', padding: '4px 12px' }}>{current.bpm} BPM</span>
+                        </div>
+                      ) : null}
 
-                      {/* action buttons — inside card */}
-                      <div className="pt-2 pb-3 flex flex-col items-center gap-2">
-                        <div className="flex items-center justify-center gap-4">
+                      {/* Action buttons */}
+                      <div className="relative z-10 mt-4 pb-1 flex flex-col items-center gap-3">
+                        <div className="flex items-center justify-between w-full">
+
+                          {/* Undo — ghost, 40px */}
                           <button
                             aria-label="Undo"
                             onClick={onUndo}
                             disabled={fling.active}
-                            className={`w-10 h-10 rounded-full text-gray-400 flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                            className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-[0.92] disabled:opacity-40"
+                            style={{ color: '#666666' }}
                           >
-                            <RotateCcw size={18} />
+                            <RotateCcw size={16} />
                           </button>
+
+                          {/* No/X — 52px, dark bg, coral icon */}
                           <button
                             aria-label="No"
                             onClick={onNo}
                             disabled={fling.active}
-                            className={`w-10 h-10 rounded-full text-[#E8502A] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                            className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-transform active:scale-[0.92] disabled:opacity-40"
+                            style={{ background: '#1C1C1E', color: '#E8502A' }}
                           >
-                            <X size={18} />
+                            <X size={20} />
                           </button>
+
+                          {/* Yes/Check — 64px, orange fill, shadow */}
                           <button
                             aria-label="Yes"
                             onClick={onYes}
                             disabled={fling.active}
-                            className="w-14 h-14 rounded-full bg-[#E8502A] text-white flex items-center justify-center transition-colors"
+                            className="w-16 h-16 rounded-full bg-[#E8502A] text-white flex items-center justify-center transition-transform active:scale-[0.92] disabled:opacity-40 shadow-[0_4px_14px_rgba(232,80,42,0.45)]"
                           >
-                            <Check size={22} />
+                            <Check size={26} />
                           </button>
+
+                          {/* Star — 52px, dark bg, gold icon */}
                           <button
                             aria-label="Star"
                             onClick={onStar}
                             disabled={fling.active}
-                            className={`w-10 h-10 rounded-full text-[#D4A017] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                            className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-transform active:scale-[0.92] disabled:opacity-40"
+                            style={{ background: '#1C1C1E', color: '#D4A017' }}
                           >
-                            <Star size={18} />
+                            <Star size={20} />
                           </button>
+
+                          {/* Skip — ghost, 40px */}
                           <button
                             aria-label="Skip"
                             onClick={onSkip}
                             disabled={fling.active}
-                            className={`w-10 h-10 rounded-full text-[#D4A017] flex items-center justify-center transition-colors ${darkMode ? "bg-[#2A2A2A]" : "bg-[#F5F5F5]"}`}
+                            className="w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-[0.92] disabled:opacity-40"
+                            style={{ color: '#666666' }}
                           >
-                            <SkipForward size={18} />
+                            <SkipForward size={16} />
                           </button>
+
                         </div>
-                        <p className={`text-xs text-center ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Swipe left to pass, swipe right to add</p>
+                        {!hasSwipedOnce && (
+                          <p
+                            className="text-xs text-center"
+                            style={{ color: '#888888', opacity: hintFading ? 0 : 1, transition: 'opacity 600ms ease-out' }}
+                          >
+                            Swipe left to pass, swipe right to add
+                          </p>
+                        )}
                       </div>
 
-                      {/* overlays */}
+                      {/* Swipe direction overlays */}
                       <div className="pointer-events-none">
                         <div
                           className="absolute left-4 top-4 text-green-700/70 bg-green-50/50 border border-green-200/30 rounded-lg px-3 py-1 text-sm font-normal"
@@ -1307,11 +1428,11 @@ useEffect(() => {
                           ↧ Skip
                         </div>
                       </div>
-                    </div>
+                    </>
                   ) : (
                     <div className="text-center py-16">
                       <div className="text-2xl font-semibold">You have reviewed all songs</div>
-                      <p className="text-slate-600 mt-2">Export your results or reset to start again.</p>
+                      <p className="text-gray-400 mt-2">Export your results or reset to start again.</p>
                     </div>
                   )}
 
@@ -1320,45 +1441,78 @@ useEffect(() => {
             </section>
 
 
-            {/* sidebar under the card (stacked layout) */}
-            <aside className="space-y-4">
-              <Panel title="Stats">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <Stat label="Must haves" value={starList.length} />
-                  <Stat label="Yes" value={yesList.length} />
-                  <Stat label="No" value={noList.length} />
-                </div>
-              </Panel>
+            </div>
+          )}
+        </div>
 
-              <Panel title="Peek lists">
-                <PeekList title="Must haves" items={starList} />
-                <PeekList title="Approved" items={yesList.filter((s) => !starList.includes(s))} />
-                <PeekList title="No thanks" items={noList} />
-              </Panel>
+        {/* ── Your List tab ── */}
+        <div
+          style={{
+            position: 'absolute', inset: 0,
+            display: activeTab === 'list' ? 'block' : 'none',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <div style={{ padding: '16px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}>
 
-              <Panel title="Tips">
-                <ul className="text-sm text-slate-600 space-y-2 list-disc pl-5">
-                  <li>Swipe left for No, right for Yes, up for Must have.</li>
-                  <li>Use keyboard shortcuts for speed. Try Space for Yes and S for Star.</li>
-                  <li>Upload a new file any time to replace the list. Progress is saved locally to your browser.</li>
-                </ul>
-              </Panel>
-            </aside>
+            {/* Stats row */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+              <Stat label="Must Haves" value={starList.length} />
+              <Stat label="Yes" value={yesList.length} />
+              <Stat label="No" value={noList.length} />
+            </div>
+
+            {/* YOUR SELECTIONS section label */}
+            <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', color: '#888888', textTransform: 'uppercase', marginBottom: '8px', paddingLeft: '4px' }}>
+              Your Selections
+            </div>
+
+            {/* Peek lists card */}
+            <div style={{ background: '#1A1A1A', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+              <PeekList title="Must Haves" items={starList} />
+              <div style={{ height: '1px', background: '#2A2A2A' }} />
+              <PeekList title="Approved" items={yesList.filter((s) => !starList.includes(s))} />
+              <div style={{ height: '1px', background: '#2A2A2A' }} />
+              <PeekList title="No Thanks" items={noList} />
+            </div>
+
           </div>
-        )}
-      </main>
+        </div>
 
-      <footer className="py-6 text-center text-xs text-slate-500">Made for choosing bangers, not ballads only. Choose responsibly.</footer>
+      </div> {/* end tab content area */}
+
+      {/* ── Bottom tab bar ─────────────────────────────── */}
+      <div style={{display:'flex', flexDirection:'row', width:'100%',
+        height:'50px', paddingBottom:'env(safe-area-inset-bottom)',
+        background:'#111111', borderTop:'1px solid #2A2A2A',
+        position:'fixed', bottom:0, left:0, right:0, zIndex:30}}>
+
+        <button onClick={()=>setActiveTab('swipe')} style={{flex:1,
+          border:'none', background:'none', cursor:'pointer',
+          fontSize:'15px', fontWeight:600, paddingTop:'10px',
+          color: activeTab==='swipe' ? '#E8522A' : '#aaaaaa'}}>
+          Swipe
+        </button>
+
+        <button onClick={()=>setActiveTab('list')} style={{flex:1,
+          border:'none', background:'none', cursor:'pointer',
+          fontSize:'15px', fontWeight:600, paddingTop:'10px',
+          color: activeTab==='list' ? '#E8522A' : '#aaaaaa'}}>
+          Your List
+        </button>
+
+      </div>
 
       {coffeeOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-          <div className="w-[min(92vw,420px)] rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
-            <h3 className="text-lg font-semibold mb-1">Enjoying Swipe to Dance?</h3>
-            <p className="text-slate-600 mb-4">If this saved you time, you can buy me a coffee ☕</p>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60">
+          <div className="w-[min(92vw,420px)] rounded-2xl bg-[#1A1A1A] shadow-xl border border-[#2A2A2A] p-5">
+            <h3 className="text-lg font-semibold text-white mb-1">Enjoying Swipe to Dance?</h3>
+            <p className="text-gray-400 mb-4">If this saved you time, you can buy me a coffee ☕</p>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setCoffeeOpen(false)}
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm"
+                className="px-3 py-2 rounded-xl border border-[#2A2A2A] bg-[#111111] hover:bg-[#2A2A2A] text-gray-300 text-sm"
               >
                 Maybe later
               </button>
@@ -1367,7 +1521,7 @@ useEffect(() => {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setCoffeeOpen(false)}
-                className="px-3 py-2 rounded-xl bg-amber-200 text-amber-900 hover:bg-amber-300 text-sm"
+                className="px-3 py-2 rounded-xl bg-[#E8502A] text-white hover:bg-[#C43E1F] text-sm"
               >
                 Buy me a coffee
               </a>
@@ -1378,24 +1532,24 @@ useEffect(() => {
 
       {payOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={cancelPay} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl border border-pink-200 p-5">
-            <div className="text-lg font-semibold text-pink-900">Unlock Pro</div>
-            <p className="mt-1 text-sm text-slate-600">
+          <div className="absolute inset-0 bg-black/60" onClick={cancelPay} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-[#1A1A1A] shadow-xl border border-[#2A2A2A] p-5">
+            <div className="text-lg font-semibold text-white">Unlock Pro</div>
+            <p className="mt-1 text-sm text-gray-400">
               Pro lets you <strong>upload your own songs</strong> and <strong>export to Spotify</strong>.
             </p>
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-pink-100 bg-[#FFE8E0]/60 p-3">
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-[#2A2A2A] bg-[#111111] p-3">
               <div>
-                <div className="text-sm font-medium text-pink-900">One-time purchase</div>
-                <div className="text-xs text-pink-800/80">Lifetime access</div>
+                <div className="text-sm font-medium text-gray-200">One-time purchase</div>
+                <div className="text-xs text-gray-500">Lifetime access</div>
               </div>
-              <div className="text-xl font-bold text-pink-900">$5</div>
+              <div className="text-xl font-bold text-white">$5</div>
             </div>
             <div className="mt-4 flex gap-2 justify-end">
-              <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+              <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-[#2A2A2A] text-gray-300 hover:bg-[#2A2A2A]">
                 Not now
               </button>
-              <button onClick={startCheckout} className="px-3 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500">
+              <button onClick={startCheckout} className="px-3 py-2 rounded-lg bg-[#E8502A] text-white hover:bg-[#C43E1F]">
                 Continue to checkout
               </button>
             </div>
@@ -1405,7 +1559,7 @@ useEffect(() => {
 
       {toast ? (
         <div className="fixed bottom-6 right-6 z-50">
-          <div className="rounded-xl border border-pink-200 bg-white/95 shadow-lg px-4 py-2 text-sm text-pink-900">{toast}</div>
+          <div className="rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] shadow-lg px-4 py-2 text-sm text-gray-200">{toast}</div>
         </div>
       ) : null}
     </div>
@@ -1413,41 +1567,80 @@ useEffect(() => {
 }
 
 /* ---------- tiny UI helpers ---------- */
-function Panel({ title, children }) {
-  return (
-    <div className="rounded-xl bg-white border border-rose-200 shadow-none">
-      <div className="px-5 py-3 border-b border-rose-100 bg-[#FFE8E0]/60 text-rose-800 font-medium rounded-t-xl">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
 function Stat({ label, value }) {
   return (
-    <div className="rounded-lg bg-[#FFE8E0] border border-rose-100 p-4">
-      <div className="text-2xl font-semibold text-rose-900">{value}</div>
-      <div className="text-xs text-rose-700/80">{label}</div>
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '16px 8px',
+      background: '#1A1A1A',
+      borderRadius: '12px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    }}>
+      <div style={{ fontSize: '32px', fontWeight: 700, color: '#FFFFFF', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: '12px', fontWeight: 400, color: '#aaaaaa', marginTop: '6px' }}>{label}</div>
     </div>
   );
 }
 
 function PeekList({ title, items }) {
   const MAX = 6;
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, MAX);
+  const hasMore = !expanded && items.length > MAX;
+
   return (
-    <div className="mb-3">
-      <div className="text-xs font-semibold text-slate-500 mb-1">
+    <div>
+      {/* Sub-section header */}
+      <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', color: '#aaaaaa', textTransform: 'uppercase', padding: '12px 16px 4px' }}>
         {title} ({items.length})
       </div>
-      <div className="space-y-1 max-h-48 overflow-auto pr-1">
-        {items.slice(0, MAX).map((s, i) => (
-          <div key={s.__id} className="text-sm truncate">
-            {i + 1}. {s.title}
-            {s.artist ? ` — ${s.artist}` : ""}
-          </div>
-        ))}
 
-        {items.length > MAX ? <div className="text-xs text-slate-400">{`+ ${items.length - MAX} more`}</div> : null}
-      </div>
+      {/* Empty state */}
+      {items.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '16px', fontSize: '14px', color: '#bbbbbb' }}>
+          No songs yet — keep swiping
+        </div>
+      ) : (
+        <>
+          {visible.map((s, i) => (
+            <div key={s.__id} style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', minHeight: '56px', padding: '8px 16px', gap: '12px' }}>
+                <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#cccccc', minWidth: '18px', textAlign: 'right', flexShrink: 0 }}>
+                  {i + 1}
+                </span>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 500, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.title}
+                  </div>
+                  {s.artist && (
+                    <div style={{ fontSize: '13px', fontWeight: 400, color: '#888888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {s.artist}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {i < visible.length - 1 && (
+                <div style={{ position: 'absolute', bottom: 0, left: '46px', right: 0, height: '1px', background: '#2A2A2A' }} />
+              )}
+            </div>
+          ))}
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              style={{ display: 'flex', alignItems: 'center', width: '100%', minHeight: '44px', padding: '0 16px 0 46px', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: '14px', fontWeight: 500, color: '#E8502A' }}>
+                + {items.length - MAX} more
+              </span>
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }

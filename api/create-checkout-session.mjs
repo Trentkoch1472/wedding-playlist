@@ -1,7 +1,7 @@
 // /api/create-checkout-session.mjs
 import Stripe from 'stripe';
 
-const CANONICAL_DOMAIN = process.env.SITE_URL || 'https://swipetodance.trentkoch.com';
+const CANONICAL_DOMAIN = process.env.SITE_URL || 'https://swipedj.app';
 const PRICE_ID = process.env.PRICE_ID;
 
 export default async function handler(req, res) {

@@ -16,14 +16,18 @@ export default function ExportScreen({
   const yesOnly = acceptedSongs.filter(
     (s) => !starredSongs.find((st) => st.__id === s.__id)
   );
-  const totalAdded = acceptedSongs.length; // starred are included in accepted
+  const totalAdded = acceptedSongs.length;
+
+  // DJ-linked couples have their export covered by the DJ's subscription
+  const isLinkedToDJ = !!localStorage.getItem('swipedj_client_id');
+  const exportUnlocked = proUnlocked || isLinkedToDJ;
 
   /* ── Spotify button state ─────────────────────────────── */
   let spotifyLabel, spotifySub, spotifyIcon, spotifyAction;
 
-  if (!proUnlocked) {
+  if (!exportUnlocked) {
     spotifyLabel = "Unlock on Spotify";
-    spotifySub = "$9.99 one-time";
+    spotifySub = "$14.99 one-time";
     spotifyIcon = <Lock size={18} className="flex-shrink-0" />;
     spotifyAction = onStartCheckout;
   } else if (!spUser) {
@@ -39,41 +43,41 @@ export default function ExportScreen({
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF6F0] flex flex-col items-center px-4 py-12">
-      <div className="max-w-sm w-full flex flex-col gap-8">
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 16px' }}>
+      <div style={{ width: '100%', maxWidth: '384px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
         {/* ── Celebratory header ─────────────────────────── */}
-        <div className="text-center">
-          <div className="text-5xl mb-4">🎉</div>
-          <h1 className="text-2xl font-black text-[#1A1A1A] leading-tight">
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1.2, margin: 0 }}>
             Your playlist is ready!
           </h1>
-          <p className="text-sm text-gray-500 mt-2">
+          <p style={{ fontSize: '14px', color: '#888888', marginTop: '8px', marginBottom: 0 }}>
             Time to get the dancefloor going.
           </p>
         </div>
 
         {/* ── Stats ──────────────────────────────────────── */}
-        <div className="flex justify-center gap-6">
-          <div className="text-center">
-            <div className="text-3xl font-black text-[#E8502A]">{totalAdded}</div>
-            <div className="text-xs text-gray-500 mt-0.5 font-semibold uppercase tracking-wide">
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#E8502A' }}>{totalAdded}</div>
+            <div style={{ fontSize: '11px', color: '#888888', marginTop: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               songs added
             </div>
           </div>
-          <div className="w-px bg-gray-200" />
-          <div className="text-center">
-            <div className="text-3xl font-black text-[#D4A017]">{starredSongs.length}</div>
-            <div className="text-xs text-gray-500 mt-0.5 font-semibold uppercase tracking-wide">
+          <div style={{ width: '1px', background: '#2A2A2A' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#D4A017' }}>{starredSongs.length}</div>
+            <div style={{ fontSize: '11px', color: '#888888', marginTop: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               must-haves
             </div>
           </div>
           {yesOnly.length > 0 && (
             <>
-              <div className="w-px bg-gray-200" />
-              <div className="text-center">
-                <div className="text-3xl font-black text-[#1A1A1A]">{yesOnly.length}</div>
-                <div className="text-xs text-gray-500 mt-0.5 font-semibold uppercase tracking-wide">
+              <div style={{ width: '1px', background: '#2A2A2A' }} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF' }}>{yesOnly.length}</div>
+                <div style={{ fontSize: '11px', color: '#888888', marginTop: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   approved
                 </div>
               </div>
@@ -82,18 +86,25 @@ export default function ExportScreen({
         </div>
 
         {/* ── Action buttons ─────────────────────────────── */}
-        <div className="flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
           {/* CSV export — free */}
           <button
             type="button"
             onClick={onExportCSV}
             disabled={!totalAdded}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-[#E8502A] text-[#E8502A] font-bold text-base bg-white hover:bg-[#FFE8E0] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '14px', borderRadius: '16px',
+              border: '2px solid #E8502A', background: '#1C1C1E',
+              color: '#E8502A', fontWeight: 700, fontSize: '15px',
+              cursor: totalAdded ? 'pointer' : 'not-allowed', opacity: totalAdded ? 1 : 0.4,
+              transition: 'opacity 0.15s',
+            }}
           >
             <Download size={18} />
             Export as CSV
-            <span className="text-xs font-normal opacity-60">(free)</span>
+            <span style={{ fontSize: '12px', fontWeight: 400, opacity: 0.6 }}>(free)</span>
           </button>
 
           {/* Spotify export — paid */}
@@ -101,30 +112,37 @@ export default function ExportScreen({
             type="button"
             onClick={spotifyAction}
             disabled={spBusy}
-            className="w-full flex flex-col items-center justify-center gap-0.5 py-4 rounded-2xl bg-[#E8502A] text-white font-bold text-base shadow-lg hover:bg-[#C43E1F] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{
+              width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+              padding: '16px', borderRadius: '16px',
+              background: '#E8502A', color: '#FFFFFF',
+              fontWeight: 700, fontSize: '15px', border: 'none',
+              cursor: spBusy ? 'not-allowed' : 'pointer', opacity: spBusy ? 0.6 : 1,
+              boxShadow: '0 4px 20px rgba(232,80,42,0.4)', transition: 'opacity 0.15s',
+            }}
           >
-            <span className="flex items-center gap-2">
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {spotifyIcon}
               {spotifyLabel}
             </span>
-            <span className="text-xs font-normal opacity-70">{spotifySub}</span>
+            <span style={{ fontSize: '12px', fontWeight: 400, opacity: 0.7 }}>{spotifySub}</span>
           </button>
 
         </div>
 
         {/* ── Pro badge when unlocked ─────────────────────── */}
-        {proUnlocked && (
-          <p className="text-center text-xs text-[#D4A017] font-semibold">
+        {exportUnlocked && (
+          <p style={{ textAlign: 'center', fontSize: '12px', color: '#D4A017', fontWeight: 600 }}>
             ★ Pro unlocked
           </p>
         )}
 
         {/* ── Start over ─────────────────────────────────── */}
-        <div className="text-center pt-2">
+        <div style={{ textAlign: 'center', paddingTop: '8px' }}>
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#E8502A] transition-colors"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#888888', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             <RefreshCw size={13} />
             Start over

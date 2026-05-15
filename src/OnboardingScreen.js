@@ -61,14 +61,14 @@ function applyFilters(songs, { eventType, vibes, englishOnly, hideExplicit }) {
 function Toggle({ label, checked, onChange }) {
   return (
     <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
-      <span className="text-sm font-semibold text-[#1A1A1A]">{label}</span>
+      <span className="text-sm font-semibold text-white">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8502A] ${
-          checked ? "bg-[#E8502A]" : "bg-gray-300"
+          checked ? "bg-[#E8502A]" : "bg-[#3A3A3A]"
         }`}
       >
         <span
@@ -147,21 +147,21 @@ export default function OnboardingScreen({ onComplete }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF6F0] flex items-center justify-center">
-        <p className="text-gray-400 text-sm animate-pulse">Loading songs…</p>
+      <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center">
+        <p className="text-gray-500 text-sm animate-pulse">Loading songs…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF6F0] flex flex-col items-center px-4 py-10">
+    <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center px-4 py-10">
       <div className="max-w-sm w-full space-y-8">
 
         {/* Header */}
         <div className="text-center">
-          <img src="/logo.png" alt="SwipeDJ" className="h-10 w-auto mx-auto mb-3" />
-          <h1 className="text-2xl font-black text-[#1A1A1A]">Build Your Playlist</h1>
-          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+          <img src="/swipeDJ logo.svg" alt="SwipeDJ" className="h-8 w-auto mx-auto mb-3" />
+          <h1 className="text-2xl font-black text-white">Build Your Playlist</h1>
+          <p className="text-sm mt-1 leading-relaxed" style={{ color: '#888888' }}>
             Tell us about your event and we'll curate the perfect mix.
           </p>
         </div>
@@ -180,7 +180,7 @@ export default function OnboardingScreen({ onComplete }) {
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors border ${
                   eventType === t
                     ? "bg-[#E8502A] text-white border-[#E8502A]"
-                    : "bg-white text-[#1A1A1A] border-gray-200 hover:border-[#E8502A]"
+                    : "bg-[#1C1C1E] text-white border-[#2C2C2E] hover:border-[#E8502A]"
                 }`}
               >
                 {t}
@@ -194,7 +194,7 @@ export default function OnboardingScreen({ onComplete }) {
           <p className="text-xs font-bold tracking-widest text-[#E8502A] uppercase mb-1">
             Music Vibe
           </p>
-          <p className="text-xs text-gray-400 mb-3">Pick any that fit — leave blank for everything</p>
+          <p className="text-xs mb-3" style={{ color: '#888888' }}>Pick any that fit — leave blank for everything</p>
           <div className="flex flex-wrap gap-2">
             {VIBE_OPTIONS.map((v) => {
               const selected = vibes.includes(v.label);
@@ -206,7 +206,7 @@ export default function OnboardingScreen({ onComplete }) {
                   className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-colors border ${
                     selected
                       ? "bg-[#E8502A] text-white border-[#E8502A]"
-                      : "bg-white text-[#1A1A1A] border-gray-200 hover:border-[#E8502A]"
+                      : "bg-[#1C1C1E] text-white border-[#2C2C2E] hover:border-[#E8502A]"
                   }`}
                 >
                   {v.label}
@@ -217,9 +217,9 @@ export default function OnboardingScreen({ onComplete }) {
         </div>
 
         {/* Toggles */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 space-y-4 shadow-sm">
+        <div className="rounded-2xl bg-[#1C1C1E] border border-[#2C2C2E] p-4 space-y-4">
           <Toggle label="English songs only" checked={englishOnly} onChange={setEnglishOnly} />
-          <div className="h-px bg-gray-100" />
+          <div className="h-px bg-[#2C2C2E]" />
           <Toggle label="Hide explicit songs" checked={hideExplicit} onChange={setHideExplicit} />
         </div>
 
