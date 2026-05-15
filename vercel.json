@@ -4,9 +4,6 @@
       "GENERATE_SOURCEMAP": "false"
     }
   },
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
   "headers": [
     {
       "source": "/(.*)",
