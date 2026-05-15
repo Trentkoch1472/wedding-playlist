@@ -688,6 +688,7 @@ for (const q of attempts) {
         setDrag({ dx: 0, dy: 0, active: false });
       }, 360);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [current, fling.active, songs.length, setChoices, setIndex, stopPreview]
   );
 
