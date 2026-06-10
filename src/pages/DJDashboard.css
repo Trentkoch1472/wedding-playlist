@@ -1,0 +1,44 @@
+/* DJ Dashboard responsive overrides */
+
+/* Stats row: stack vertically on small screens */
+.dj-stats-row {
+  display: flex;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .dj-stats-row {
+    flex-direction: column;
+  }
+
+  /* Reduce header padding on mobile */
+  .dj-header-inner {
+    padding: 0 16px;
+  }
+
+  /* Tighten main content padding */
+  .dj-main {
+    padding: 16px 12px;
+  }
+
+  /* Client row: allow pill to wrap below the name on very small screens */
+  .dj-client-row-meta {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  /* Invite link: stack copy button below URL on mobile */
+  .dj-invite-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dj-invite-row button {
+    width: 100%;
+  }
+
+  /* Song rows: keep album art from shrinking */
+  .dj-song-row {
+    gap: 10px;
+  }
+}

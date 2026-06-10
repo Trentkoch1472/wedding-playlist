@@ -2,6 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import './Landing.css';
 
+const APP_STORE_URL = 'https://apps.apple.com/app/swipedj/idPLACEHOLDER';
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 const TRACKS = [
   {
     title: "Low",
@@ -102,7 +105,10 @@ export default function Landing() {
               <a href="#djs">For DJs</a>
               <a href="#faq">FAQ</a>
             </div>
-            <Link to="/app" className="nav-cta">Get the app</Link>
+            {isIOS
+              ? <a href={APP_STORE_URL} className="nav-cta">Get the app</a>
+              : <Link to="/app" className="nav-cta">Get the app</Link>
+            }
           </div>
         </nav>
 
@@ -123,7 +129,7 @@ export default function Landing() {
                   Start swiping free
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
                 </Link>
-                <a className="appstore" href="#cta">
+                <a className="appstore" href={isIOS ? APP_STORE_URL : '#cta'}>
                   <svg className="appstore-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M17.05 12.5c0-2.95 2.4-4.36 2.5-4.43-1.36-2-3.49-2.27-4.24-2.3-1.81-.18-3.53 1.07-4.45 1.07-.93 0-2.34-1.05-3.85-1.02-1.98.03-3.81 1.15-4.83 2.92-2.06 3.58-.53 8.86 1.48 11.77 1 1.42 2.18 3.02 3.74 2.96 1.5-.06 2.07-.97 3.88-.97 1.81 0 2.32.97 3.91.94 1.61-.03 2.63-1.45 3.61-2.88 1.13-1.65 1.6-3.25 1.62-3.34-.04-.02-3.11-1.19-3.14-4.72zM14.34 4c.81-1 1.36-2.36 1.21-3.74-1.17.05-2.6.78-3.43 1.76-.75.87-1.41 2.27-1.23 3.61 1.31.1 2.64-.66 3.45-1.63z"/>
                   </svg>
@@ -418,8 +424,7 @@ export default function Landing() {
                 Start swiping free
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
               </Link>
-              {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-              <a className="appstore" href="#cta">
+              <a className="appstore" href={isIOS ? APP_STORE_URL : '#cta'}>
                 <svg className="appstore-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M17.05 12.5c0-2.95 2.4-4.36 2.5-4.43-1.36-2-3.49-2.27-4.24-2.3-1.81-.18-3.53 1.07-4.45 1.07-.93 0-2.34-1.05-3.85-1.02-1.98.03-3.81 1.15-4.83 2.92-2.06 3.58-.53 8.86 1.48 11.77 1 1.42 2.18 3.02 3.74 2.96 1.5-.06 2.07-.97 3.88-.97 1.81 0 2.32.97 3.91.94 1.61-.03 2.63-1.45 3.61-2.88 1.13-1.65 1.6-3.25 1.62-3.34-.04-.02-3.11-1.19-3.14-4.72zM14.34 4c.81-1 1.36-2.36 1.21-3.74-1.17.05-2.6.78-3.43 1.76-.75.87-1.41 2.27-1.23 3.61 1.31.1 2.64-.66 3.45-1.63z"/>
                 </svg>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import './DJDashboard.css';
 
 /* ─── helpers ─────────────────────────────────────────────── */
 function fmt(dateStr) {
@@ -207,7 +208,7 @@ function ClientDetail({ client, onBack }) {
 
   function SongRow({ song, index, total, titleStyle }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: index < total - 1 ? '1px solid #2A2A2A' : 'none' }}>
+      <div className="dj-song-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: index < total - 1 ? '1px solid #2A2A2A' : 'none' }}>
         {song.album_art_url
           ? <img src={song.album_art_url} alt="" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />
           : <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: '#2A2A2A', flexShrink: 0 }} />
@@ -241,7 +242,7 @@ function ClientDetail({ client, onBack }) {
   }
 
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 16px' }}>
+    <div className="dj-main" style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 16px' }}>
       <button onClick={onBack}
         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#888888', fontSize: '14px', cursor: 'pointer', padding: 0, marginBottom: '24px' }}>
         ← Back to clients
@@ -260,7 +261,7 @@ function ClientDetail({ client, onBack }) {
       {/* Invite link */}
       <div style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
         <div style={{ fontSize: '11px', fontWeight: 600, color: '#888888', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>Client invite link</div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="dj-invite-row" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <code style={{ flex: 1, fontSize: '12px', color: '#a8a29e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: '#0D0D0D', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2A2A2A' }}>
             {inviteUrl}
           </code>
@@ -332,7 +333,7 @@ function ClientList({ djId, djName, onSelectClient, onSignOut }) {
     <div style={{ minHeight: '100vh', background: '#0D0D0D', color: '#ffffff' }}>
       {/* Header */}
       <header style={{ borderBottom: '1px solid #2A2A2A', padding: '0 24px' }}>
-        <div style={{ maxWidth: '720px', margin: '0 auto', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="dj-header-inner" style={{ maxWidth: '720px', margin: '0 auto', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/swipeDJ logo.svg" alt="SwipeDJ" style={{ height: '24px' }} />
             <span style={{ fontSize: '12px', color: '#888888', borderLeft: '1px solid #2A2A2A', paddingLeft: '12px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>DJ</span>
@@ -347,9 +348,9 @@ function ClientList({ djId, djName, onSelectClient, onSignOut }) {
         </div>
       </header>
 
-      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 16px' }}>
+      <div className="dj-main" style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 16px' }}>
         {/* Stats */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
+        <div className="dj-stats-row" style={{ marginBottom: '28px' }}>
           <Stat label="Total clients" value={clients.length} />
           <Stat label="Upcoming weddings" value={upcoming} />
           <Stat label="Active sessions" value={active} />
