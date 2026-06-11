@@ -8,6 +8,7 @@ import ForDJs from './pages/ForDJs';
 import DJLogin from './pages/DJLogin';
 import DJDashboard from './pages/DJDashboard';
 import InviteHandler from './pages/InviteHandler';
+import ResetPassword from './pages/ResetPassword';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -21,6 +22,7 @@ root.render(
         <Route path="/dj/*" element={<DJDashboard />} />
         <Route path="/app/*" element={<App />} />
         <Route path="/invite/:token" element={<InviteHandler />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

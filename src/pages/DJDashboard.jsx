@@ -40,13 +40,19 @@ function Stat({ label, value }) {
 
 /* ─── Auth screen ─────────────────────────────────────────── */
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  function switchMode(m) {
+    setMode(m);
+    setError('');
+    setSuccess('');
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -55,7 +61,13 @@ function AuthScreen({ onAuth }) {
     setLoading(true);
 
     try {
-      if (mode === 'signup') {
+      if (mode === 'forgot') {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (resetError) throw resetError;
+        setSuccess('Check your email for a password reset link.');
+      } else if (mode === 'signup') {
         const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
         if (signUpError) throw signUpError;
         if (data.user) {
@@ -93,24 +105,38 @@ function AuthScreen({ onAuth }) {
         </div>
 
         <div style={{ background: '#1A1A1A', borderRadius: '16px', padding: '28px', border: '1px solid #2A2A2A' }}>
-          <div style={{ display: 'flex', marginBottom: '24px', background: '#0D0D0D', borderRadius: '10px', padding: '4px' }}>
-            {['login', 'signup'].map(m => (
-              <button key={m} onClick={() => { setMode(m); setError(''); setSuccess(''); }}
-                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, transition: 'all 0.15s',
-                  background: mode === m ? '#2A2A2A' : 'transparent',
-                  color: mode === m ? '#ffffff' : '#888888',
-                }}>
-                {m === 'login' ? 'Log in' : 'Sign up'}
-              </button>
-            ))}
-          </div>
+
+          {/* Tab bar — hidden in forgot mode */}
+          {mode !== 'forgot' && (
+            <div style={{ display: 'flex', marginBottom: '24px', background: '#0D0D0D', borderRadius: '10px', padding: '4px' }}>
+              {['login', 'signup'].map(m => (
+                <button key={m} onClick={() => switchMode(m)}
+                  style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, transition: 'all 0.15s',
+                    background: mode === m ? '#2A2A2A' : 'transparent',
+                    color: mode === m ? '#ffffff' : '#888888',
+                  }}>
+                  {m === 'login' ? 'Log in' : 'Sign up'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Forgot-mode header */}
+          {mode === 'forgot' && (
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>Reset your password</h2>
+              <p style={{ margin: 0, fontSize: '13px', color: '#888888' }}>Enter your email and we'll send you a reset link.</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {mode === 'signup' && (
               <input style={inp} type="text" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} />
             )}
             <input style={inp} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input style={inp} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+            {mode !== 'forgot' && (
+              <input style={inp} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+            )}
 
             {error && <p style={{ fontSize: '13px', color: '#f87171', margin: 0 }}>{error}</p>}
             {success && <p style={{ fontSize: '13px', color: '#4ade80', margin: 0 }}>{success}</p>}
@@ -119,9 +145,23 @@ function AuthScreen({ onAuth }) {
               style={{ marginTop: '4px', width: '100%', padding: '13px', borderRadius: '10px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                 background: '#E8502A', color: '#ffffff', fontSize: '15px', fontWeight: 600, opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s',
               }}>
-              {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+              {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
             </button>
           </form>
+
+          {/* Forgot / Back links */}
+          {mode === 'login' && (
+            <button onClick={() => switchMode('forgot')}
+              style={{ marginTop: '14px', display: 'block', width: '100%', background: 'none', border: 'none', color: '#888888', fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+              Forgot your password?
+            </button>
+          )}
+          {mode === 'forgot' && (
+            <button onClick={() => switchMode('login')}
+              style={{ marginTop: '14px', display: 'block', width: '100%', background: 'none', border: 'none', color: '#888888', fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+              ← Back to log in
+            </button>
+          )}
         </div>
       </div>
     </div>
