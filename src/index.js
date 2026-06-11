@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import App from './App';
 import Landing from './pages/Landing';
+import ForDJs from './pages/ForDJs';
 import DJLogin from './pages/DJLogin';
 import DJDashboard from './pages/DJDashboard';
 import InviteHandler from './pages/InviteHandler';
@@ -15,6 +16,7 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/for-djs" element={<ForDJs />} />
         <Route path="/dj/login" element={<DJLogin />} />
         <Route path="/dj/*" element={<DJDashboard />} />
         <Route path="/app/*" element={<App />} />

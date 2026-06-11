@@ -185,9 +185,10 @@ function AddClientModal({ djId, onClose, onAdded }) {
 }
 
 /* ─── Client Detail ───────────────────────────────────────── */
-function ClientDetail({ client, onBack }) {
+function ClientDetail({ client, djId, isSubscribed, onBack }) {
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
   const inviteUrl = `${window.location.origin}/app?client=${client.invite_token}`;
 
   useEffect(() => {
@@ -265,9 +266,9 @@ function ClientDetail({ client, onBack }) {
           <code style={{ flex: 1, fontSize: '12px', color: '#a8a29e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: '#0D0D0D', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2A2A2A' }}>
             {inviteUrl}
           </code>
-          <button onClick={copyInvite}
+          <button onClick={isSubscribed ? copyInvite : () => setShowPaywall(true)}
             style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Copy
+            {isSubscribed ? 'Copy' : '🔒 Copy'}
           </button>
         </div>
       </div>
@@ -305,15 +306,20 @@ function ClientDetail({ client, onBack }) {
           />
         </>
       )}
+
+      {showPaywall && (
+        <PaywallModal djId={djId} onClose={() => setShowPaywall(false)} />
+      )}
     </div>
   );
 }
 
 /* ─── Client List ─────────────────────────────────────────── */
-function ClientList({ djId, djName, onSelectClient, onSignOut }) {
+function ClientList({ djId, djName, isSubscribed, onSelectClient, onSignOut }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('clients')
@@ -361,7 +367,7 @@ function ClientList({ djId, djName, onSelectClient, onSignOut }) {
           <div style={{ fontSize: '11px', fontWeight: 600, color: '#888888', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Clients ({clients.length})
           </div>
-          <button onClick={() => setShowAdd(true)}
+          <button onClick={() => isSubscribed ? setShowAdd(true) : setShowPaywall(true)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Add couple
           </button>
@@ -374,7 +380,7 @@ function ClientList({ djId, djName, onSelectClient, onSignOut }) {
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>💍</div>
             <div style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff', marginBottom: '8px' }}>No clients yet</div>
             <div style={{ fontSize: '14px', color: '#888888', marginBottom: '20px' }}>Add your first couple to get started.</div>
-            <button onClick={() => setShowAdd(true)}
+            <button onClick={() => isSubscribed ? setShowAdd(true) : setShowPaywall(true)}
               style={{ padding: '11px 20px', borderRadius: '10px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
               Add couple
             </button>
@@ -419,12 +425,16 @@ function ClientList({ djId, djName, onSelectClient, onSignOut }) {
           }}
         />
       )}
+
+      {showPaywall && (
+        <PaywallModal djId={djId} onClose={() => setShowPaywall(false)} />
+      )}
     </div>
   );
 }
 
-/* ─── DJ Paywall ──────────────────────────────────────────── */
-function DJPaywall({ djId }) {
+/* ─── Paywall Modal ───────────────────────────────────────── */
+function PaywallModal({ djId, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -451,48 +461,47 @@ function DJPaywall({ djId }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img src="/swipeDJ logo.svg" alt="SwipeDJ" style={{ height: '28px', marginBottom: '12px' }} />
-          <div style={{ fontSize: '13px', color: '#888888', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>DJ Dashboard</div>
+      <div style={{ width: '100%', maxWidth: '400px', background: '#1C1C1E', borderRadius: '20px', padding: '32px', border: '1px solid #2A2A2A', position: 'relative' }}>
+        {/* Close button */}
+        <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#555555', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+
+        <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#ffffff' }}>Unlock full access</h2>
+        <div style={{ fontSize: '30px', fontWeight: 800, color: '#ffffff', margin: '14px 0 4px' }}>
+          $49<span style={{ fontSize: '15px', fontWeight: 400, color: '#888888' }}>/month</span>
         </div>
+        <div style={{ fontSize: '13px', color: '#E8502A', marginBottom: '20px', fontWeight: 600 }}>14-day free trial — no charge today</div>
 
-        <div style={{ background: '#1C1C1E', borderRadius: '20px', padding: '32px', border: '1px solid #2A2A2A' }}>
-          <h2 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: 700, color: '#ffffff' }}>Start your DJ License</h2>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#ffffff', margin: '16px 0 4px' }}>
-            $49<span style={{ fontSize: '16px', fontWeight: 400, color: '#888888' }}>/month</span>
-          </div>
-          <div style={{ fontSize: '13px', color: '#E8502A', marginBottom: '24px', fontWeight: 600 }}>14-day free trial — no charge today</div>
+        <ul style={{ margin: '0 0 24px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '9px' }}>
+          {[
+            'Unlimited clients',
+            'Real-time playlist sync',
+            'Do not play list',
+            'Must-haves tracking',
+            'CSV export per client',
+          ].map(f => (
+            <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#cccccc' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#E8502A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 8 3.5 3.5L13 5"/>
+              </svg>
+              {f}
+            </li>
+          ))}
+        </ul>
 
-          <ul style={{ margin: '0 0 28px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[
-              'Unlimited clients',
-              'Real-time playlist sync',
-              'Do not play list',
-              'Must-haves tracking',
-              'CSV export per client',
-            ].map(f => (
-              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#cccccc' }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#E8502A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m3 8 3.5 3.5L13 5"/>
-                </svg>
-                {f}
-              </li>
-            ))}
-          </ul>
+        {error && <p style={{ fontSize: '13px', color: '#f87171', margin: '0 0 12px' }}>{error}</p>}
 
-          {error && <p style={{ fontSize: '13px', color: '#f87171', margin: '0 0 12px' }}>{error}</p>}
-
-          <button onClick={startTrial} disabled={loading}
-            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '16px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            {loading
-              ? <><div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Starting…</>
-              : 'Start 14-day free trial'
-            }
-          </button>
-        </div>
+        <button onClick={startTrial} disabled={loading}
+          style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {loading
+            ? <><div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Starting…</>
+            : 'Start 14-day free trial'
+          }
+        </button>
       </div>
     </div>
   );
@@ -516,11 +525,16 @@ export default function DJDashboard() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [checkoutPending, setCheckoutPending] = useState(false);
 
-  // Detect returning from Stripe checkout
+  // Detect ?role=dj (DJ-origin signup) and ?checkout=success (returning from Stripe)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('role') === 'dj') {
+      localStorage.setItem('pendingRole', 'dj');
+      window.history.replaceState({}, document.title, '/dj');
+    }
     if (params.get('checkout') === 'success') {
       setCheckoutPending(true);
+      localStorage.removeItem('pendingRole');
       window.history.replaceState({}, document.title, '/dj');
     }
   }, []);
@@ -559,6 +573,7 @@ export default function DJDashboard() {
 
   async function signOut() {
     await supabase.auth.signOut();
+    localStorage.removeItem('pendingRole');
     setSelectedClient(null);
   }
 
@@ -579,18 +594,25 @@ export default function DJDashboard() {
     return <VerifyingScreen />;
   }
 
-  if (profile?.stripe_subscription_status !== 'active') {
-    return <DJPaywall djId={session.user.id} />;
-  }
+  const isSubscribed = profile?.stripe_subscription_status === 'active';
+  const djId = session.user.id;
 
   if (selectedClient) {
-    return <ClientDetail client={selectedClient} onBack={() => setSelectedClient(null)} />;
+    return (
+      <ClientDetail
+        client={selectedClient}
+        djId={djId}
+        isSubscribed={isSubscribed}
+        onBack={() => setSelectedClient(null)}
+      />
+    );
   }
 
   return (
     <ClientList
-      djId={session.user.id}
+      djId={djId}
       djName={profile?.name || session.user.email}
+      isSubscribed={isSubscribed}
       onSelectClient={setSelectedClient}
       onSignOut={signOut}
     />

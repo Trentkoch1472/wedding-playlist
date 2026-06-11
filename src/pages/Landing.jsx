@@ -102,7 +102,7 @@ export default function Landing() {
             <div className="nav-links">
               <a href="#how">How it works</a>
               <a href="#pricing">Pricing</a>
-              <a href="#djs">For DJs</a>
+              <Link to="/for-djs">For DJs</Link>
               <a href="#faq">FAQ</a>
             </div>
             {isIOS
@@ -332,10 +332,10 @@ export default function Landing() {
                   ))}
                 </ul>
 
-                <a href="#cta" className="plan-cta">
-                  Start 14-day trial
+                <Link to="/for-djs" className="plan-cta">
+                  Learn more for DJs
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-                </a>
+                </Link>
               </div>
 
             </div>
@@ -444,7 +444,7 @@ export default function Landing() {
               <div className="footer-links">
                 <a href="#how">How it works</a>
                 <a href="#pricing">Pricing</a>
-                <a href="#djs">For DJs</a>
+                <Link to="/for-djs">For DJs</Link>
                 {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
                 <a href="#privacy">Privacy</a>
                 {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
