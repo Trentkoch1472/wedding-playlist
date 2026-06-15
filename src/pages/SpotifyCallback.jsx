@@ -74,8 +74,8 @@ export default function SpotifyCallback() {
         const js = await r.json();
 
         if (!r.ok || !js.access_token) {
-          const detail = js.error_description || js.error || `HTTP ${r.status}`;
           console.error('[SpotifyCallback] token exchange failed:', js);
+          const detail = [js.error, js.error_description].filter(Boolean).join(' — ') || `HTTP ${r.status}`;
           throw new Error(detail);
         }
 
