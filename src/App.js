@@ -1216,8 +1216,9 @@ useEffect(() => {
                             src={toHttps(nextSong.__art)}
                             referrerPolicy="no-referrer"
                             alt={`${nextSong.title} cover`}
-                            className="mx-auto mt-4 w-28 h-28 rounded-xl shadow-md object-cover"
-                            loading="lazy"
+                            draggable="false"
+                            className="relative z-10 w-full rounded-[16px] object-cover mt-4"
+                            style={{ height: '260px', imageRendering: 'high-quality', pointerEvents: 'none' }}
                           />
                         ) : null}
 
