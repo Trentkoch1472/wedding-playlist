@@ -464,10 +464,10 @@ for (const q of attempts) {
     if (item) {
       if (!bestPreview && item.previewUrl) bestPreview = item.previewUrl;
       if (!bestArt) {
-        const raw = item.artworkUrl100 || item.artworkUrl60 || item.artworkUrl512 || null;
+        const raw = item.artworkUrl100 || item.artworkUrl60 || null;
         if (raw) {
-          const big = raw.replace(/\/\d+x\d+bb\//, "/600x600bb/");
-          bestArt = big || raw;
+          // iTunes CDN supports arbitrary sizes — replace e.g. "100x100bb.jpg" → "1200x1200bb.jpg"
+          bestArt = raw.replace(/\d+x\d+bb\.jpg/, "1200x1200bb.jpg");
           console.log("Found art:", bestArt);
         }
       }
