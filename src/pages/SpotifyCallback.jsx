@@ -51,7 +51,7 @@ export default function SpotifyCallback() {
 
     // Use the redirect_uri that was stored when login started
     const storedRedirect = sessionStorage.getItem(SS_REDIRECT_URI);
-    const clientId       = process.env.REACT_APP_SPOTIFY_CLIENT_ID;
+    const clientId       = '7ced125c87d944d09bb2a301f8576fb8';
     const redirectUri    = storedRedirect && storedRedirect.startsWith(window.location.origin)
       ? storedRedirect
       : `${window.location.origin}/callback`;
