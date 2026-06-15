@@ -49,12 +49,12 @@ export default function SpotifyCallback() {
       return;
     }
 
-    // Use the redirect_uri that was stored when login started
-    const storedRedirect = sessionStorage.getItem(SS_REDIRECT_URI);
-    const clientId       = '7ced125c87d944d09bb2a301f8576fb8';
-    const redirectUri    = storedRedirect && storedRedirect.startsWith(window.location.origin)
-      ? storedRedirect
-      : `${window.location.origin}/callback`;
+    const clientId    = '7ced125c87d944d09bb2a301f8576fb8';
+    // redirect_uri in the token exchange MUST be byte-for-byte identical to
+    // what was sent in the authorization request and registered in the Spotify dashboard.
+    // We hardcode it to avoid any origin-mismatch surprises from sessionStorage.
+    const redirectUri = 'https://swipedj.app/callback';
+    console.log('[SpotifyCallback] using redirect_uri:', redirectUri);
 
     async function exchange() {
       try {
@@ -74,9 +74,9 @@ export default function SpotifyCallback() {
         const js = await r.json();
 
         if (!r.ok || !js.access_token) {
-          console.error('[SpotifyCallback] token exchange failed:', js);
+          console.error('[SpotifyCallback] token exchange failed. redirect_uri sent:', redirectUri, 'Spotify response:', js);
           const detail = [js.error, js.error_description].filter(Boolean).join(' — ') || `HTTP ${r.status}`;
-          throw new Error(detail);
+          throw new Error(`${detail}\n\nredirect_uri sent: ${redirectUri}`);
         }
 
         const expAt = Date.now() + (js.expires_in || 3600) * 1000 - 60_000;
