@@ -63,7 +63,7 @@ function AuthScreen({ onAuth }) {
     try {
       if (mode === 'forgot') {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: 'https://swipedj.app/reset-password',
         });
         if (resetError) throw resetError;
         setSuccess('Check your email for a password reset link.');
