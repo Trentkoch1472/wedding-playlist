@@ -15,7 +15,9 @@
       "mcp__063eb6df-2e62-42d3-935f-513265fc741b__apply_migration",
       "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_teams",
       "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_deployments",
-      "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_projects"
+      "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_projects",
+      "Bash(npx react-scripts *)",
+      "Bash(npx eslint *)"
     ]
   }
 }
