@@ -5,6 +5,7 @@ export default function ExportScreen({
   acceptedSongs,   // yesList (yes + star)
   starredSongs,    // starList
   proUnlocked,
+  isLinkedToDJ,
   spUser,
   spBusy,
   onExportCSV,
@@ -19,7 +20,6 @@ export default function ExportScreen({
   const totalAdded = acceptedSongs.length;
 
   // DJ-linked couples have their export covered by the DJ's subscription
-  const isLinkedToDJ = !!localStorage.getItem('swipedj_client_id');
   const exportUnlocked = proUnlocked || isLinkedToDJ;
 
   /* ── Spotify button state ─────────────────────────────── */

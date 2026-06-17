@@ -185,7 +185,7 @@ function AddClientModal({ djId, onClose, onAdded }) {
       partner_1_name: p1,
       partner_2_name: p2 || null,
       wedding_date: date || null,
-      status: 'invited',
+      status: 'pending',
     }).select().single();
     setLoading(false);
     if (err) { setError(err.message); return; }
@@ -246,7 +246,6 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteUrl);
       } else {
-        // Fallback for non-secure contexts or older browsers
         const ta = document.createElement('textarea');
         ta.value = inviteUrl;
         ta.style.position = 'fixed';
@@ -256,6 +255,10 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
+      }
+      // Mark couple as invited now that the link has been shared
+      if (client.status !== 'invited' && client.status !== 'active') {
+        supabase.from('clients').update({ status: 'invited' }).eq('id', client.id);
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

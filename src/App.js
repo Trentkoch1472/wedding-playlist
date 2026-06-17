@@ -942,6 +942,7 @@ useEffect(() => {
         acceptedSongs={yesList}
         starredSongs={starList}
         proUnlocked={proUnlocked}
+        isLinkedToDJ={!!clientIdRef.current}
         spUser={spUser}
         spBusy={spBusy}
         onExportCSV={exportPlaylist}
