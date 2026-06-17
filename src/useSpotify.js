@@ -75,7 +75,7 @@ export default function useSpotify({
 
     // If we returned from Spotify with a code, exchange it
     if (code) {
-      const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || "";
+      const expectedState = getCookie(SS_AUTH_STATE) || sessionStorage.getItem(SS_AUTH_STATE) || "";
       if (!returnedState || returnedState !== expectedState) {
         setMsg("Spotify login aborted (state mismatch).");
         url.searchParams.delete("code");
@@ -132,6 +132,8 @@ export default function useSpotify({
           } catch {}
 
           // Clean up one-time items + query params
+          deleteCookie(SS_CODE_VERIFIER);
+          deleteCookie(SS_AUTH_STATE);
           sessionStorage.removeItem(SS_CODE_VERIFIER);
           sessionStorage.removeItem(SS_AUTH_STATE);
           sessionStorage.removeItem(SS_REDIRECT_URI);
