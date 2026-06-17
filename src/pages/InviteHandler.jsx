@@ -11,7 +11,7 @@ export default function InviteHandler() {
     async function resolve() {
       const { data, error } = await supabase
         .from('clients')
-        .select('id')
+        .select('id, status')
         .eq('invite_token', token)
         .single();
 
@@ -21,6 +21,12 @@ export default function InviteHandler() {
       }
 
       localStorage.setItem('swipedj_client_id', data.id);
+
+      // Advance to 'invited' the first time the couple opens the link
+      if (data.status === 'pending') {
+        supabase.from('clients').update({ status: 'invited' }).eq('id', data.id);
+      }
+
       navigate('/app', { replace: true });
     }
 

@@ -10,17 +10,28 @@ function fmt(dateStr) {
   });
 }
 
+// Derives the display status from stored status + wedding date.
+// A couple is 'complete' once their wedding date has passed, regardless of stored status.
+function effectiveStatus(client) {
+  if (client.wedding_date) {
+    const weddingDay = new Date(client.wedding_date + 'T23:59:59');
+    if (weddingDay < new Date()) return 'complete';
+  }
+  return client.status || 'pending';
+}
+
 function statusColor(status) {
   switch (status) {
     case 'active':   return { background: '#1a3a1a', color: '#4ade80', border: '1px solid #166534' };
     case 'invited':  return { background: '#1a2a3a', color: '#60a5fa', border: '1px solid #1e40af' };
-    case 'complete': return { background: '#2a2a1a', color: '#fbbf24', border: '1px solid #92400e' };
+    case 'complete': return { background: '#1a1a3a', color: '#a78bfa', border: '1px solid #4c1d95' };
     default:         return { background: '#1C1C1E', color: '#888888', border: '1px solid #2A2A2A' };
   }
 }
 
 /* ─── sub-components ──────────────────────────────────────── */
-function Pill({ status }) {
+function Pill({ client }) {
+  const status = effectiveStatus(client);
   const s = statusColor(status);
   return (
     <span style={{ ...s, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
@@ -256,10 +267,6 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      // Mark couple as invited now that the link has been shared
-      if (client.status !== 'invited' && client.status !== 'active') {
-        supabase.from('clients').update({ status: 'invited' }).eq('id', client.id);
-      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
@@ -320,7 +327,7 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
           </h1>
           <div style={{ fontSize: '14px', color: '#888888' }}>{fmt(client.wedding_date)}</div>
         </div>
-        <Pill status={client.status} />
+        <Pill client={client} />
       </div>
 
       {/* Invite link */}
@@ -396,8 +403,8 @@ function ClientList({ djId, djName, isSubscribed, onSelectClient, onSignOut }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const upcoming = clients.filter(c => c.wedding_date && new Date(c.wedding_date) >= new Date()).length;
-  const active   = clients.filter(c => c.status === 'active').length;
+  const upcoming = clients.filter(c => c.wedding_date && new Date(c.wedding_date + 'T23:59:59') >= new Date()).length;
+  const active   = clients.filter(c => effectiveStatus(c) === 'active').length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', color: '#ffffff' }}>
