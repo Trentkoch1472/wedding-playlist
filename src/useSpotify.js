@@ -17,7 +17,7 @@ const SS_REDIRECT_URI = "sp_redirect_uri";
 // SameSite=Lax ensures cookies ARE sent on top-level cross-site GET redirects
 // (i.e. when Spotify redirects back to /callback), but NOT on cross-site POSTs.
 function setCookie(name, value) {
-  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie = `${name}=${encodeURIComponent(value)}; SameSite=Lax; Path=/${secure}`;
 }
 function getCookie(name) {

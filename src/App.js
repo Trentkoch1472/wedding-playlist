@@ -38,26 +38,6 @@ function toHttps(u) {
   return typeof u === "string" ? u.replace(/^http:\/\//i, "https://") : u;
 }
 
-// Add this CORS proxy function at the top with your other helper functions
-async function fetchWithCORS(url) {
-  try {
-    // First try direct fetch with desktop user agent to avoid mobile restrictions
-    const response = await fetch(url, {
-      mode: "cors",
-      credentials: "omit",
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-    console.log("Direct fetch succeeded for:", url);
-    return response;
-  } catch (error) {
-    // If direct fetch fails, try with a CORS proxy
-    console.warn("Direct fetch failed, trying CORS proxy:", error);
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    return fetch(proxyUrl);
-  }
-}
 
 // iOS check in module scope to avoid hook dependency warnings
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
