@@ -201,10 +201,13 @@ export default function useSpotify({
     const challenge = await codeChallengeS256(verifier);
     const authState = randUrlSafe(16);
 
-    // use sessionStorage so multiple tabs don't collide
+    // sessionStorage is preferred (tab-scoped) but Safari private mode clears it on
+    // cross-origin navigation, so mirror to localStorage as a fallback.
     sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
     sessionStorage.setItem(SS_AUTH_STATE, authState);
     sessionStorage.setItem(SS_REDIRECT_URI, redirectUri);
+    localStorage.setItem(SS_CODE_VERIFIER, verifier);
+    localStorage.setItem(SS_AUTH_STATE, authState);
 
     const url = new URL(AUTH_URL);
     url.searchParams.set("client_id", clientId);

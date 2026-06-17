@@ -430,12 +430,12 @@ const startCheckout = useCallback(async () => {
       let bestPreview = havePreview ? song.__preview : null;
       let bestArt = haveArt ? song.__art : null;
 
-    // Try iTunes first
+    // Try iTunes first (via server-side proxy to avoid browser CORS/CSP issues)
 for (const q of attempts) {
   try {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&country=US&limit=5`;
+    const url = `/api/itunes?q=${encodeURIComponent(q)}`;
     console.log("Fetching iTunes for:", q);
-    const r = await fetchWithCORS(url);
+    const r = await fetch(url);
     console.log("iTunes fetch status:", r.status, r.ok);
     const j = await r.json();
     console.log("iTunes results count:", j.results?.length || 0);

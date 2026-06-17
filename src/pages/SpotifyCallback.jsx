@@ -35,14 +35,16 @@ export default function SpotifyCallback() {
     }
 
     // State mismatch — possible CSRF
-    const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || '';
+    // Read from sessionStorage first; fall back to localStorage (Safari private mode
+    // clears sessionStorage when navigating cross-origin and back).
+    const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || localStorage.getItem(SS_AUTH_STATE) || '';
     if (!state || state !== expectedState) {
       setErrorMsg('State mismatch — please try connecting Spotify again.');
       setStatus('error');
       return;
     }
 
-    const verifier = sessionStorage.getItem(SS_CODE_VERIFIER);
+    const verifier = sessionStorage.getItem(SS_CODE_VERIFIER) || localStorage.getItem(SS_CODE_VERIFIER);
     if (!verifier) {
       setErrorMsg('Missing PKCE verifier — please try connecting Spotify again.');
       setStatus('error');
@@ -86,10 +88,12 @@ export default function SpotifyCallback() {
           expAt,
         }));
 
-        // Clean up one-time sessionStorage entries
+        // Clean up one-time PKCE entries from both storage locations
         sessionStorage.removeItem(SS_CODE_VERIFIER);
         sessionStorage.removeItem(SS_AUTH_STATE);
         sessionStorage.removeItem(SS_REDIRECT_URI);
+        localStorage.removeItem(SS_CODE_VERIFIER);
+        localStorage.removeItem(SS_AUTH_STATE);
 
         // Hard navigate — App needs to mount fresh and pick up the token from localStorage
         window.location.replace('/app');
