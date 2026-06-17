@@ -118,8 +118,8 @@ export default function App() {
   // Dark mode
   const [darkMode, setDarkMode] = useState(true);
 
-  // Export screen
-  const [showExport, setShowExport] = useState(false);
+  // Export screen — persisted so Spotify OAuth redirect doesn't send user back to swipe screen
+  const [showExport, setShowExport] = useLocalState("wps_show_export", false);
 
   // Handlers for Upload menu
 const triggerUploadAdd = () => {
@@ -230,6 +230,8 @@ const defaultSongsRef = useRef(null);
   const [hintFading, setHintFading] = useState(false);
   const hasSwipedOnceRef = useRef(hasSwipedOnce);
   const clientIdRef = useRef(localStorage.getItem('swipedj_client_id'));
+  // Reactive version so ExportScreen re-evaluates when Spotify connects after redirect
+  const [isLinkedToDJ, setIsLinkedToDJ] = useState(() => !!localStorage.getItem('swipedj_client_id'));
   const [payOpen, setPayOpen] = useState(false);
   const pendingActionRef = useRef(null);
 
@@ -353,6 +355,7 @@ const startCheckout = useCallback(async () => {
 
       localStorage.setItem('swipedj_client_id', data.id);
       clientIdRef.current = data.id;
+      setIsLinkedToDJ(true);
 
       // Clean token from URL without triggering a reload
       params.delete("client");
@@ -377,7 +380,7 @@ const startCheckout = useCallback(async () => {
     if (songs.length > 0 && index >= songs.length) {
       setShowExport(true);
     }
-  }, [songs.length, index]);
+  }, [songs.length, index, setShowExport]);
 
   /* ---- Preview audio + cover art ---- */
   const [previewAudio, setPreviewAudio] = useState(null);
@@ -917,13 +920,12 @@ useEffect(() => {
   }
 
   if (showExport) {
-    console.log('[App] clientIdRef.current at export:', clientIdRef.current);
     return (
       <ExportScreen
         acceptedSongs={yesList}
         starredSongs={starList}
         proUnlocked={proUnlocked}
-        isLinkedToDJ={!!clientIdRef.current}
+        isLinkedToDJ={isLinkedToDJ}
         spUser={spUser}
         spBusy={spBusy}
         onExportCSV={exportPlaylist}
