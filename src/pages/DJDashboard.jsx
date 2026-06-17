@@ -239,8 +239,29 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
       .then(({ data }) => { setSongs(data || []); setLoading(false); });
   }, [client.id]);
 
-  function copyInvite() {
-    navigator.clipboard.writeText(inviteUrl).catch(() => {});
+  const [copied, setCopied] = useState(false);
+
+  async function copyInvite() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteUrl);
+      } else {
+        // Fallback for non-secure contexts or older browsers
+        const ta = document.createElement('textarea');
+        ta.value = inviteUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
   }
 
   const mustHaves = songs.filter(s => s.decision === 'must_have');
@@ -308,7 +329,7 @@ function ClientDetail({ client, djId, isSubscribed, onBack }) {
           </code>
           <button onClick={isSubscribed ? copyInvite : () => setShowPaywall(true)}
             style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#E8502A', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {isSubscribed ? 'Copy' : '🔒 Copy'}
+            {!isSubscribed ? '🔒 Copy' : copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
       </div>
