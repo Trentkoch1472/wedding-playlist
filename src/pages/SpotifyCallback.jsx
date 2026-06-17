@@ -45,9 +45,13 @@ export default function SpotifyCallback() {
     // State mismatch — possible CSRF
     // Try cookies first (most reliable in private/incognito — survive cross-origin redirects),
     // then fall back to sessionStorage and localStorage.
-    const expectedState = getCookie(SS_AUTH_STATE) || sessionStorage.getItem(SS_AUTH_STATE) || localStorage.getItem(SS_AUTH_STATE) || '';
+    const cookieState = getCookie(SS_AUTH_STATE);
+    const ssState = sessionStorage.getItem(SS_AUTH_STATE);
+    const lsState = localStorage.getItem(SS_AUTH_STATE);
+    const expectedState = cookieState || ssState || lsState || '';
+    console.log('[SpotifyCallback] state check', { urlState: state, cookieState, ssState, lsState, expectedState });
     if (!state || state !== expectedState) {
-      setErrorMsg('State mismatch — please try connecting Spotify again.');
+      setErrorMsg(`State mismatch\nURL state: "${state}"\nCookie: "${cookieState}"\nSessionStorage: "${ssState}"\nLocalStorage: "${lsState}"`);
       setStatus('error');
       return;
     }
