@@ -13,6 +13,21 @@ const SS_CODE_VERIFIER = "sp_code_verifier";
 const SS_AUTH_STATE   = "sp_auth_state";
 const SS_REDIRECT_URI = "sp_redirect_uri";
 
+// ---------- Cookie helpers (most reliable in private/incognito) ----------
+// SameSite=Lax ensures cookies ARE sent on top-level cross-site GET redirects
+// (i.e. when Spotify redirects back to /callback), but NOT on cross-site POSTs.
+function setCookie(name, value) {
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${encodeURIComponent(value)}; SameSite=Lax; Path=/${secure}`;
+}
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function deleteCookie(name) {
+  document.cookie = `${name}=; Max-Age=0; Path=/`;
+}
+
 // ---------- PKCE helpers ----------
 function b64urlFromBuffer(buf) {
   let str = btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -201,8 +216,12 @@ export default function useSpotify({
     const challenge = await codeChallengeS256(verifier);
     const authState = randUrlSafe(16);
 
-    // sessionStorage is preferred (tab-scoped) but Safari private mode clears it on
-    // cross-origin navigation, so mirror to localStorage as a fallback.
+    // Cookies are the most reliable cross-browser storage for cross-origin redirects
+    // (sessionStorage and localStorage can be cleared by Safari private mode during
+    // cross-origin navigation). SameSite=Lax means cookies survive the Spotify redirect.
+    setCookie(SS_CODE_VERIFIER, verifier);
+    setCookie(SS_AUTH_STATE, authState);
+    // Keep sessionStorage and localStorage as additional fallbacks
     sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
     sessionStorage.setItem(SS_AUTH_STATE, authState);
     sessionStorage.setItem(SS_REDIRECT_URI, redirectUri);

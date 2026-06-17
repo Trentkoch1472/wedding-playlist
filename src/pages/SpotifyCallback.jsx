@@ -6,6 +6,14 @@ const SS_AUTH_STATE    = 'sp_auth_state';
 const SS_REDIRECT_URI  = 'sp_redirect_uri';
 const LS_TOKEN         = 'sp_token_v2';
 
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function deleteCookie(name) {
+  document.cookie = `${name}=; Max-Age=0; Path=/`;
+}
+
 export default function SpotifyCallback() {
   const [status, setStatus] = useState('loading'); // 'loading' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,16 +43,16 @@ export default function SpotifyCallback() {
     }
 
     // State mismatch — possible CSRF
-    // Read from sessionStorage first; fall back to localStorage (Safari private mode
-    // clears sessionStorage when navigating cross-origin and back).
-    const expectedState = sessionStorage.getItem(SS_AUTH_STATE) || localStorage.getItem(SS_AUTH_STATE) || '';
+    // Try cookies first (most reliable in private/incognito — survive cross-origin redirects),
+    // then fall back to sessionStorage and localStorage.
+    const expectedState = getCookie(SS_AUTH_STATE) || sessionStorage.getItem(SS_AUTH_STATE) || localStorage.getItem(SS_AUTH_STATE) || '';
     if (!state || state !== expectedState) {
       setErrorMsg('State mismatch — please try connecting Spotify again.');
       setStatus('error');
       return;
     }
 
-    const verifier = sessionStorage.getItem(SS_CODE_VERIFIER) || localStorage.getItem(SS_CODE_VERIFIER);
+    const verifier = getCookie(SS_CODE_VERIFIER) || sessionStorage.getItem(SS_CODE_VERIFIER) || localStorage.getItem(SS_CODE_VERIFIER);
     if (!verifier) {
       setErrorMsg('Missing PKCE verifier — please try connecting Spotify again.');
       setStatus('error');
@@ -88,7 +96,9 @@ export default function SpotifyCallback() {
           expAt,
         }));
 
-        // Clean up one-time PKCE entries from both storage locations
+        // Clean up one-time PKCE entries from all storage locations
+        deleteCookie(SS_CODE_VERIFIER);
+        deleteCookie(SS_AUTH_STATE);
         sessionStorage.removeItem(SS_CODE_VERIFIER);
         sessionStorage.removeItem(SS_AUTH_STATE);
         sessionStorage.removeItem(SS_REDIRECT_URI);
