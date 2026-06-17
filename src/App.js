@@ -937,6 +937,7 @@ useEffect(() => {
   }
 
   if (showExport) {
+    console.log('[App] clientIdRef.current at export:', clientIdRef.current);
     return (
       <ExportScreen
         acceptedSongs={yesList}

@@ -19,6 +19,9 @@ export default function ExportScreen({
   );
   const totalAdded = acceptedSongs.length;
 
+  console.log('[ExportScreen] isLinkedToDJ prop:', isLinkedToDJ);
+  console.log('[ExportScreen] localStorage swipedj_client_id:', localStorage.getItem('swipedj_client_id'));
+
   // DJ-linked couples have their export covered by the DJ's subscription
   const exportUnlocked = proUnlocked || isLinkedToDJ;
 
