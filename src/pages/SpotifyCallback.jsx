@@ -1,18 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const TOKEN_PROXY      = '/api/spotify-token';
-const SS_CODE_VERIFIER = 'sp_code_verifier';
-const SS_AUTH_STATE    = 'sp_auth_state';
-const SS_REDIRECT_URI  = 'sp_redirect_uri';
-const LS_TOKEN         = 'sp_token_v2';
-
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
-}
-function deleteCookie(name) {
-  document.cookie = `${name}=; Max-Age=0; Path=/`;
-}
+const TOKEN_PROXY = '/api/spotify-token';
+const LS_TOKEN    = 'sp_token_v2';
 
 export default function SpotifyCallback() {
   const [status, setStatus] = useState('loading'); // 'loading' | 'error'
@@ -23,52 +12,43 @@ export default function SpotifyCallback() {
     if (ran.current) return;
     ran.current = true;
 
-    const url    = new URL(window.location.href);
-    const code   = url.searchParams.get('code');
-    const state  = url.searchParams.get('state');
+    const url        = new URL(window.location.href);
+    const code       = url.searchParams.get('code');
+    const state      = url.searchParams.get('state');
     const oauthError = url.searchParams.get('error');
 
-    // Spotify reported an error
     if (oauthError) {
       setErrorMsg(`Spotify declined the connection: ${oauthError}`);
       setStatus('error');
       return;
     }
 
-    // Missing code
     if (!code) {
       setErrorMsg('No authorization code in the callback URL.');
       setStatus('error');
       return;
     }
 
-    // State mismatch — possible CSRF
-    // Try cookies first (most reliable in private/incognito — survive cross-origin redirects),
-    // then fall back to sessionStorage and localStorage.
-    const cookieState = getCookie(SS_AUTH_STATE);
-    const ssState = sessionStorage.getItem(SS_AUTH_STATE);
-    const lsState = localStorage.getItem(SS_AUTH_STATE);
-    const expectedState = cookieState || ssState || lsState || '';
-    console.log('[SpotifyCallback] state check', { urlState: state, cookieState, ssState, lsState, expectedState });
-    if (!state || state !== expectedState) {
-      setErrorMsg(`State mismatch\nURL state: "${state}"\nCookie: "${cookieState}"\nSessionStorage: "${ssState}"\nLocalStorage: "${lsState}"`);
+    // State format: "nonce.verifier" — the verifier is encoded directly in state
+    // so no browser storage is needed. This survives Facebook auth popups/tabs,
+    // Safari private mode, and any other context that clears sessionStorage/localStorage/cookies.
+    if (!state || !state.includes('.')) {
+      setErrorMsg(`Invalid state parameter: "${state}". Please try connecting Spotify again.`);
       setStatus('error');
       return;
     }
 
-    const verifier = getCookie(SS_CODE_VERIFIER) || sessionStorage.getItem(SS_CODE_VERIFIER) || localStorage.getItem(SS_CODE_VERIFIER);
-    if (!verifier) {
-      setErrorMsg('Missing PKCE verifier — please try connecting Spotify again.');
+    const dotIdx  = state.indexOf('.');
+    const verifier = state.slice(dotIdx + 1);
+
+    if (!verifier || verifier.length < 40) {
+      setErrorMsg('Malformed state — verifier missing. Please try connecting Spotify again.');
       setStatus('error');
       return;
     }
 
-    const clientId    = '7ced125c87d944d09bb2a301f8576fb8';
-    // redirect_uri in the token exchange MUST be byte-for-byte identical to
-    // what was sent in the authorization request and registered in the Spotify dashboard.
-    // We hardcode it to avoid any origin-mismatch surprises from sessionStorage.
+    const clientId   = '7ced125c87d944d09bb2a301f8576fb8';
     const redirectUri = 'https://swipedj.app/callback';
-    console.log('[SpotifyCallback] using redirect_uri:', redirectUri);
 
     async function exchange() {
       try {
@@ -88,9 +68,8 @@ export default function SpotifyCallback() {
         const js = await r.json();
 
         if (!r.ok || !js.access_token) {
-          console.error('[SpotifyCallback] token exchange failed. redirect_uri sent:', redirectUri, 'Spotify response:', js);
           const detail = [js.error, js.error_description].filter(Boolean).join(' — ') || `HTTP ${r.status}`;
-          throw new Error(`${detail}\n\nredirect_uri sent: ${redirectUri}`);
+          throw new Error(detail);
         }
 
         const expAt = Date.now() + (js.expires_in || 3600) * 1000 - 60_000;
@@ -100,16 +79,6 @@ export default function SpotifyCallback() {
           expAt,
         }));
 
-        // Clean up one-time PKCE entries from all storage locations
-        deleteCookie(SS_CODE_VERIFIER);
-        deleteCookie(SS_AUTH_STATE);
-        sessionStorage.removeItem(SS_CODE_VERIFIER);
-        sessionStorage.removeItem(SS_AUTH_STATE);
-        sessionStorage.removeItem(SS_REDIRECT_URI);
-        localStorage.removeItem(SS_CODE_VERIFIER);
-        localStorage.removeItem(SS_AUTH_STATE);
-
-        // Hard navigate — App needs to mount fresh and pick up the token from localStorage
         window.location.replace('/app');
 
       } catch (e) {
@@ -139,7 +108,7 @@ export default function SpotifyCallback() {
     return (
       <div style={containerStyle}>
         <div style={{ fontSize: '32px' }}>⚠️</div>
-        <p style={{ margin: 0, fontSize: '15px', color: '#f87171', textAlign: 'center', maxWidth: '340px' }}>
+        <p style={{ margin: 0, fontSize: '15px', color: '#f87171', textAlign: 'center', maxWidth: '340px', whiteSpace: 'pre-line' }}>
           {errorMsg}
         </p>
         <a

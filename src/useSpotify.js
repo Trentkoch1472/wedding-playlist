@@ -8,25 +8,7 @@ const API_BASE = "https://api.spotify.com/v1";
 const TOKEN_PROXY = "/api/spotify-token";
 
 // Storage keys
-const LS_TOKEN = "sp_token_v2";                 // { accessToken, refreshToken, expAt }
-const SS_CODE_VERIFIER = "sp_code_verifier";
-const SS_AUTH_STATE   = "sp_auth_state";
-const SS_REDIRECT_URI = "sp_redirect_uri";
-
-// ---------- Cookie helpers (most reliable in private/incognito) ----------
-// SameSite=Lax ensures cookies ARE sent on top-level cross-site GET redirects
-// (i.e. when Spotify redirects back to /callback), but NOT on cross-site POSTs.
-function setCookie(name, value) {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${name}=${encodeURIComponent(value)}; SameSite=Lax; Path=/${secure}`;
-}
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
-}
-function deleteCookie(name) {
-  document.cookie = `${name}=; Max-Age=0; Path=/`;
-}
+const LS_TOKEN = "sp_token_v2"; // { accessToken, refreshToken, expAt }
 
 // ---------- PKCE helpers ----------
 function b64urlFromBuffer(buf) {
@@ -73,36 +55,26 @@ export default function useSpotify({
       return;
     }
 
-    // If we returned from Spotify with a code, exchange it
+    // If we returned from Spotify with a code, exchange it.
+    // State format is "nonce.verifier" — verifier is extracted directly from state,
+    // no storage needed (handles Facebook auth popups clearing sessionStorage/localStorage).
     if (code) {
-      const expectedState = getCookie(SS_AUTH_STATE) || sessionStorage.getItem(SS_AUTH_STATE) || "";
-      if (!returnedState || returnedState !== expectedState) {
-        setMsg("Spotify login aborted (state mismatch).");
-        url.searchParams.delete("code");
-        url.searchParams.delete("state");
-        window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+      if (!returnedState || !returnedState.includes('.')) {
+        setMsg("Spotify login aborted (invalid state).");
         return;
       }
-
-      const verifier = sessionStorage.getItem(SS_CODE_VERIFIER);
-      if (!verifier) {
+      const verifier = returnedState.slice(returnedState.indexOf('.') + 1);
+      if (!verifier || verifier.length < 40) {
         setMsg("Missing PKCE verifier; please connect again.");
         return;
       }
 
       (async () => {
         try {
-          // Use the same redirect URI that initiated login
-          const fromStore = sessionStorage.getItem(SS_REDIRECT_URI);
-          const lockedRedirect =
-            fromStore && fromStore.startsWith(window.location.origin)
-              ? fromStore
-              : redirectUri;
-
           const body = new URLSearchParams({
             grant_type: "authorization_code",
             code,
-            redirect_uri: lockedRedirect,
+            redirect_uri: redirectUri,
             client_id: clientId,
             code_verifier: verifier,
           });
@@ -120,7 +92,7 @@ export default function useSpotify({
           const accessToken = js.access_token;
           const expiresIn = js.expires_in || 3600;
           const refreshTok = js.refresh_token || null;
-          const expAt = Date.now() + expiresIn * 1000 - 60_000; // refresh a minute early
+          const expAt = Date.now() + expiresIn * 1000 - 60_000;
 
           setToken(accessToken);
           setRefreshToken(refreshTok);
@@ -131,12 +103,6 @@ export default function useSpotify({
             );
           } catch {}
 
-          // Clean up one-time items + query params
-          deleteCookie(SS_CODE_VERIFIER);
-          deleteCookie(SS_AUTH_STATE);
-          sessionStorage.removeItem(SS_CODE_VERIFIER);
-          sessionStorage.removeItem(SS_AUTH_STATE);
-          sessionStorage.removeItem(SS_REDIRECT_URI);
           url.searchParams.delete("code");
           url.searchParams.delete("state");
           window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
@@ -216,19 +182,14 @@ export default function useSpotify({
   const login = useCallback(async () => {
     const verifier = randUrlSafe(64);
     const challenge = await codeChallengeS256(verifier);
-    const authState = randUrlSafe(16);
+    const nonce = randUrlSafe(16);
 
-    // Cookies are the most reliable cross-browser storage for cross-origin redirects
-    // (sessionStorage and localStorage can be cleared by Safari private mode during
-    // cross-origin navigation). SameSite=Lax means cookies survive the Spotify redirect.
-    setCookie(SS_CODE_VERIFIER, verifier);
-    setCookie(SS_AUTH_STATE, authState);
-    // Keep sessionStorage and localStorage as additional fallbacks
-    sessionStorage.setItem(SS_CODE_VERIFIER, verifier);
-    sessionStorage.setItem(SS_AUTH_STATE, authState);
-    sessionStorage.setItem(SS_REDIRECT_URI, redirectUri);
-    localStorage.setItem(SS_CODE_VERIFIER, verifier);
-    localStorage.setItem(SS_AUTH_STATE, authState);
+    // Encode the verifier directly in the state as "nonce.verifier".
+    // Spotify echoes state back verbatim, so we can extract the verifier from it
+    // without relying on any browser storage — which is unreliable when Facebook
+    // auth (or any third-party login) opens intermediate tabs/popups that clear
+    // the original page's sessionStorage, localStorage, and even cookies.
+    const authState = nonce + '.' + verifier;
 
     const url = new URL(AUTH_URL);
     url.searchParams.set("client_id", clientId);
