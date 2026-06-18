@@ -477,7 +477,7 @@ function ClientList({ djId, djName, isSubscribed, onSelectClient, onSignOut }) {
                   <div style={{ fontSize: '13px', color: '#888888', marginTop: '2px' }}>{fmt(c.wedding_date)}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                  <Pill status={c.status} />
+                  <Pill client={c} />
                   <span style={{ color: '#444', fontSize: '16px' }}>›</span>
                 </div>
               </button>
