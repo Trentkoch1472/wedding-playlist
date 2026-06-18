@@ -16,43 +16,6 @@ function getRawBody(req) {
   });
 }
 
-async function sendUnlockEmail(email, setupLink) {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'SwipeDJ <noreply@swipedj.app>',
-      to: email,
-      subject: 'Your Spotify export is unlocked 🎉',
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 16px">
-          <img src="https://swipedj.app/swipeDJ logo.svg" alt="SwipeDJ" style="height:32px;margin-bottom:24px" />
-          <h1 style="font-size:22px;font-weight:800;margin:0 0 12px">Your Spotify export is unlocked!</h1>
-          <p style="color:#555;margin:0 0 24px">
-            You can now export your wedding playlist directly to Spotify.
-            Set a password to access your unlock from any device.
-          </p>
-          <a href="${setupLink}"
-             style="display:inline-block;background:#E8502A;color:#fff;font-weight:700;
-                    padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px">
-            Set your password
-          </a>
-          <p style="color:#999;font-size:12px;margin-top:32px">
-            If you didn't purchase this, you can ignore this email.
-          </p>
-        </div>
-      `,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend error ${res.status}: ${body}`);
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -95,42 +58,39 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if a Supabase auth user exists with this email
+    // Check if a Supabase auth user already exists with this email
     const { data: { users } } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const existing = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
     let userId;
 
     if (existing) {
+      // User already has an account — just unlock, no email needed
       userId = existing.id;
     } else {
-      // Create a confirmed user — no password yet, they'll set one via the recovery link
-      const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true,
+      // New user — invite them. Supabase sends the email via its configured SMTP (Resend),
+      // with a link to set their password. redirectTo sends them back to the app.
+      const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: 'https://swipedj.app/app',
+        data: { spotify_unlocked: true },
       });
-      if (createErr) throw createErr;
-      userId = created.user.id;
+      if (inviteErr) throw inviteErr;
+      userId = invited.user.id;
     }
 
     // Upsert consumer_profiles row
     const { error: upsertErr } = await supabase.from('consumer_profiles').upsert(
-      { user_id: userId, email: email.toLowerCase(), spotify_unlocked: true, stripe_customer_id: stripeCustomerId },
+      {
+        user_id: userId,
+        email: email.toLowerCase(),
+        spotify_unlocked: true,
+        stripe_customer_id: stripeCustomerId,
+      },
       { onConflict: 'email' }
     );
     if (upsertErr) throw upsertErr;
 
-    // Generate a password-setup (recovery) link and email it
-    const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: { redirectTo: 'https://swipedj.app/app' },
-    });
-    if (linkErr) throw linkErr;
-
-    await sendUnlockEmail(email, linkData.properties.action_link);
-
-    return res.status(200).json({ received: true, userId });
+    return res.status(200).json({ received: true, userId, newUser: !existing });
   } catch (e) {
     console.error('Consumer webhook error:', e);
     return res.status(500).json({ error: e.message });
