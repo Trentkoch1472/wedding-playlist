@@ -930,12 +930,7 @@ useEffect(() => {
         spBusy={spBusy}
         onExportCSV={exportPlaylist}
         onExportSpotify={handleExportToSpotify}
-        onSpotifyLogin={() => {
-          // Write synchronously before navigation — React's useEffect-based
-          // localStorage write may not fire before the page navigates to Spotify.
-          try { localStorage.setItem('wps_show_export', 'true'); } catch {}
-          spotifyLogin();
-        }}
+        onSpotifyLogin={spotifyLogin}
         onStartCheckout={startCheckout}
         onReset={() => {
           stopPreview();

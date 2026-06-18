@@ -178,17 +178,34 @@ export default function useSpotify({
     })();
   }, [token]);
 
-  // 3) Start login (PKCE)
+  // 3) Listen for token delivered by the popup callback
+  useEffect(() => {
+    function onMessage(e) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== 'spotify_connected') return;
+      const { accessToken, refreshToken: rt, expAt } = e.data;
+      setToken(accessToken);
+      setRefreshToken(rt || null);
+      try {
+        localStorage.setItem(LS_TOKEN, JSON.stringify({ accessToken, refreshToken: rt, expAt }));
+      } catch {}
+      setMsg("");
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  // 4) Start login (PKCE) — opens a popup so the main page never navigates away.
+  // This keeps all swipe data / localStorage intact across the Facebook → Spotify redirect chain.
   const login = useCallback(async () => {
+    // Open the popup immediately while we're still in the user-gesture call stack.
+    // iOS Safari blocks window.open() if called after an await.
+    const popup = window.open('about:blank', 'spotify_auth', 'width=500,height=700,scrollbars=yes,resizable=yes');
+
     const verifier = randUrlSafe(64);
     const challenge = await codeChallengeS256(verifier);
     const nonce = randUrlSafe(16);
-
-    // Encode the verifier directly in the state as "nonce.verifier".
-    // Spotify echoes state back verbatim, so we can extract the verifier from it
-    // without relying on any browser storage — which is unreliable when Facebook
-    // auth (or any third-party login) opens intermediate tabs/popups that clear
-    // the original page's sessionStorage, localStorage, and even cookies.
+    // Encode verifier in state so SpotifyCallback can extract it without storage
     const authState = nonce + '.' + verifier;
 
     const url = new URL(AUTH_URL);
@@ -200,11 +217,13 @@ export default function useSpotify({
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("show_dialog", "true");
-    url.searchParams.set("_", Date.now().toString());
 
- console.log("Spotify auth URL:", url.toString());
-
-    window.location.assign(url.toString());
+    if (popup && !popup.closed) {
+      popup.location.href = url.toString();
+    } else {
+      // Popup was blocked — fall back to full-page redirect
+      window.location.assign(url.toString());
+    }
   }, [clientId, redirectUri, scopes]);
 
   // 4) Optional refresh-on-demand

@@ -73,13 +73,26 @@ export default function SpotifyCallback() {
         }
 
         const expAt = Date.now() + (js.expires_in || 3600) * 1000 - 60_000;
-        localStorage.setItem(LS_TOKEN, JSON.stringify({
+        const payload = {
           accessToken:  js.access_token,
           refreshToken: js.refresh_token || null,
           expAt,
-        }));
+        };
+        // Always save to localStorage as a fallback
+        try { localStorage.setItem(LS_TOKEN, JSON.stringify(payload)); } catch {}
 
-        window.location.replace('/app');
+        if (window.opener && !window.opener.closed) {
+          // Running in the popup opened by login() — send token to parent and close.
+          // The parent never navigated away so all its localStorage/state is intact.
+          window.opener.postMessage(
+            { type: 'spotify_connected', ...payload },
+            window.location.origin
+          );
+          window.close();
+        } else {
+          // Full-page fallback redirect
+          window.location.replace('/app');
+        }
 
       } catch (e) {
         console.error('[SpotifyCallback] exchange error:', e);
