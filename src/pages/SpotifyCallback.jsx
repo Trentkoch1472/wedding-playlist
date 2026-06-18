@@ -29,23 +29,16 @@ export default function SpotifyCallback() {
       return;
     }
 
-    // State format: "nonce.verifier" — the verifier is encoded directly in state
-    // so no browser storage is needed. This survives Facebook auth popups/tabs,
-    // Safari private mode, and any other context that clears sessionStorage/localStorage/cookies.
-    if (!state || !state.includes('.')) {
-      setErrorMsg(`Invalid state parameter: "${state}". Please try connecting Spotify again.`);
+    // State = 16-char nonce + 64-char verifier concatenated directly (no separator).
+    // A separator char like '.' can appear in the randUrlSafe charset and would corrupt
+    // indexOf-based splitting. Fixed-length slicing is unambiguous.
+    if (!state || state.length < 80) {
+      setErrorMsg(`Invalid state parameter (length ${state?.length ?? 0}). Please try connecting Spotify again.`);
       setStatus('error');
       return;
     }
 
-    const dotIdx  = state.indexOf('.');
-    const verifier = state.slice(dotIdx + 1);
-
-    if (!verifier || verifier.length < 40) {
-      setErrorMsg('Malformed state — verifier missing. Please try connecting Spotify again.');
-      setStatus('error');
-      return;
-    }
+    const verifier = state.slice(16); // skip 16-char nonce
 
     const clientId   = '7ced125c87d944d09bb2a301f8576fb8';
     const redirectUri = 'https://swipedj.app/callback';

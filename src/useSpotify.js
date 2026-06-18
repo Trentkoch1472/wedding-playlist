@@ -59,11 +59,12 @@ export default function useSpotify({
     // State format is "nonce.verifier" — verifier is extracted directly from state,
     // no storage needed (handles Facebook auth popups clearing sessionStorage/localStorage).
     if (code) {
-      if (!returnedState || !returnedState.includes('.')) {
+      // State = 16-char nonce + 64-char verifier (no separator to avoid charset collision)
+      if (!returnedState || returnedState.length < 80) {
         setMsg("Spotify login aborted (invalid state).");
         return;
       }
-      const verifier = returnedState.slice(returnedState.indexOf('.') + 1);
+      const verifier = returnedState.slice(16);
       if (!verifier || verifier.length < 40) {
         setMsg("Missing PKCE verifier; please connect again.");
         return;
@@ -206,7 +207,9 @@ export default function useSpotify({
     const challenge = await codeChallengeS256(verifier);
     const nonce = randUrlSafe(16);
     // Encode verifier in state so SpotifyCallback can extract it without storage
-    const authState = nonce + '.' + verifier;
+    // Concatenate without a separator — nonce is always 16 chars, verifier 64.
+    // A separator char like '.' can appear in randUrlSafe output and would corrupt the split.
+    const authState = nonce + verifier; // 80 chars total
 
     const url = new URL(AUTH_URL);
     url.searchParams.set("client_id", clientId);
@@ -216,7 +219,6 @@ export default function useSpotify({
     url.searchParams.set("state", authState);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("code_challenge", challenge);
-    url.searchParams.set("show_dialog", "true");
 
     if (popup && !popup.closed) {
       popup.location.href = url.toString();
