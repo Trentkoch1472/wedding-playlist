@@ -77,10 +77,10 @@ export default function SpotifyCallback() {
         if (window.opener && !window.opener.closed) {
           // Running in the popup opened by login() — send token to parent and close.
           // The parent never navigated away so all its localStorage/state is intact.
-          window.opener.postMessage(
-            { type: 'spotify_connected', ...payload },
-            window.location.origin
-          );
+          // Use '*' because the parent may be on www.swipedj.app while this
+          // popup landed on swipedj.app — origins differ, strict target would fail.
+          // The message type 'spotify_connected' is the security guard on the receiver.
+          window.opener.postMessage({ type: 'spotify_connected', ...payload }, '*');
           window.close();
         } else {
           // Full-page fallback redirect

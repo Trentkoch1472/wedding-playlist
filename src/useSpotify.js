@@ -182,7 +182,8 @@ export default function useSpotify({
   // 3) Listen for token delivered by the popup callback
   useEffect(() => {
     function onMessage(e) {
-      if (e.origin !== window.location.origin) return;
+      // Guard on message type rather than origin — the popup may be on a different
+      // www/non-www variant of the same domain, so strict origin check breaks.
       if (e.data?.type !== 'spotify_connected') return;
       const { accessToken, refreshToken: rt, expAt } = e.data;
       setToken(accessToken);
