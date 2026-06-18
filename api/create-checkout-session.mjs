@@ -36,8 +36,10 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price: PRICE_ID, quantity: 1 }],
-      success_url: `${CANONICAL_DOMAIN}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${CANONICAL_DOMAIN}/?canceled=1`,
+      customer_creation: 'always',   // ensures customer object + email are captured
+      billing_address_collection: 'auto',
+      success_url: `${CANONICAL_DOMAIN}/app?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${CANONICAL_DOMAIN}/app`,
     });
 
     return res.status(200).json({ url: session.url });

@@ -232,6 +232,32 @@ const defaultSongsRef = useRef(null);
   const clientIdRef = useRef(localStorage.getItem('swipedj_client_id'));
   // Reactive version so ExportScreen re-evaluates when Spotify connects after redirect
   const [isLinkedToDJ, setIsLinkedToDJ] = useState(() => !!localStorage.getItem('swipedj_client_id'));
+  // Supabase consumer account unlock
+  const [consumerUnlocked, setConsumerUnlocked] = useState(false);
+
+  useEffect(() => {
+    // Check if the current Supabase session has a consumer_profiles row with spotify_unlocked
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      const { data } = await supabase
+        .from('consumer_profiles')
+        .select('spotify_unlocked')
+        .eq('user_id', session.user.id)
+        .single();
+      if (data?.spotify_unlocked) setConsumerUnlocked(true);
+    });
+    // Also listen for sign-in events (e.g. user clicks password-setup link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!session?.user) return;
+      const { data } = await supabase
+        .from('consumer_profiles')
+        .select('spotify_unlocked')
+        .eq('user_id', session.user.id)
+        .single();
+      if (data?.spotify_unlocked) setConsumerUnlocked(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   const [payOpen, setPayOpen] = useState(false);
   const pendingActionRef = useRef(null);
 
@@ -920,7 +946,7 @@ useEffect(() => {
       <ExportScreen
         acceptedSongs={yesList}
         starredSongs={starList}
-        proUnlocked={proUnlocked}
+        proUnlocked={proUnlocked || consumerUnlocked}
         isLinkedToDJ={isLinkedToDJ}
         spUser={spUser}
         spBusy={spBusy}
