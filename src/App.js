@@ -417,11 +417,8 @@ const startCheckout = useCallback(async () => {
 for (const q of attempts) {
   try {
     const url = `/api/itunes?q=${encodeURIComponent(q)}`;
-    console.log("Fetching iTunes for:", q);
     const r = await fetch(url);
-    console.log("iTunes fetch status:", r.status, r.ok);
     const j = await r.json();
-    console.log("iTunes results count:", j.results?.length || 0);
     const results = Array.isArray(j.results) ? j.results : [];
 
     const tn = normalize(song.title);
@@ -451,7 +448,6 @@ for (const q of attempts) {
         if (raw) {
           // iTunes CDN supports arbitrary sizes — replace e.g. "100x100bb.jpg" → "1200x1200bb.jpg"
           bestArt = raw.replace(/\d+x\d+bb\.jpg/, "1200x1200bb.jpg");
-          console.log("Found art:", bestArt);
         }
       }
     }
