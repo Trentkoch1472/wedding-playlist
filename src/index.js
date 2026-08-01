@@ -9,6 +9,7 @@ import DJLogin from './pages/DJLogin';
 import DJDashboard from './pages/DJDashboard';
 import InviteHandler from './pages/InviteHandler';
 import ResetPassword from './pages/ResetPassword';
+import SetPassword from './pages/SetPassword';
 import SpotifyCallback from './pages/SpotifyCallback';
 import reportWebVitals from './reportWebVitals';
 
@@ -24,6 +25,7 @@ root.render(
         <Route path="/app/*" element={<App />} />
         <Route path="/invite/:token" element={<InviteHandler />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/set-password" element={<SetPassword />} />
         <Route path="/callback" element={<SpotifyCallback />} />
       </Routes>
     </BrowserRouter>

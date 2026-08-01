@@ -17,7 +17,12 @@
       "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_deployments",
       "mcp__7cc075ff-b58e-4736-a527-a25a121befe1__list_projects",
       "Bash(npx react-scripts *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(grep -rn \"\\\\$9\\\\.99\\\\|\\\\$5\\\\b\\\\|\\\\$14\\\\.99\\\\|9\\\\.99\\\\|14\\\\.99\\\\|price_1\" /Users/trentkoch/Desktop/wedding-playlist/src/ /Users/trentkoch/Desktop/wedding-playlist/api/create-checkout-session.mjs)",
+      "Bash(grep -rn '\\\\$5\\\\|\\\\$ 5\\\\|five dollar\\\\|price\\\\|Unlock\\\\|unlock' /Users/trentkoch/Desktop/wedding-playlist/src/App.js)",
+      "Bash(grep -i \"\\\\$\\\\|price\")",
+      "Bash(grep -rn '\\\\$' /Users/trentkoch/Desktop/wedding-playlist/src/App.js)",
+      "Bash(grep -v '\\\\${')"
     ]
   }
 }

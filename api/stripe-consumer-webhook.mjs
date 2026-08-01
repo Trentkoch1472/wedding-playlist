@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       // New user — invite them. Supabase sends the email via its configured SMTP (Resend),
       // with a link to set their password. redirectTo sends them back to the app.
       const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
-        redirectTo: 'https://swipedj.app/app',
+        redirectTo: 'https://swipedj.app/set-password',
         data: { spotify_unlocked: true },
       });
       if (inviteErr) throw inviteErr;

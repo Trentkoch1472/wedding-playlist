@@ -1134,7 +1134,7 @@ useEffect(() => {
                     className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-gradient-to-r from-[#E8502A] to-[#D4A017] text-white text-sm font-bold transition-opacity hover:opacity-90"
                   >
                     <span>Upgrade to Pro</span>
-                    <span className="text-xs font-normal opacity-80">$9.99 one-time</span>
+                    <span className="text-xs font-normal opacity-80">$14.99 one-time</span>
                   </button>
                 </>
               )}
@@ -1551,7 +1551,7 @@ useEffect(() => {
                 <div className="text-sm font-medium text-gray-200">One-time purchase</div>
                 <div className="text-xs text-gray-500">Lifetime access</div>
               </div>
-              <div className="text-xl font-bold text-white">$5</div>
+              <div className="text-xl font-bold text-white">$14.99</div>
             </div>
             <div className="mt-4 flex gap-2 justify-end">
               <button onClick={cancelPay} className="px-3 py-2 rounded-lg border border-[#2A2A2A] text-gray-300 hover:bg-[#2A2A2A]">
