@@ -104,6 +104,7 @@ export default function Landing() {
               <a href="#pricing">Pricing</a>
               <Link to="/for-djs">For DJs</Link>
               <a href="#faq">FAQ</a>
+              <Link to="/login">Log in</Link>
             </div>
             {isIOS
               ? <a href={APP_STORE_URL} className="nav-cta">Get the app</a>

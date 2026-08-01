@@ -234,28 +234,26 @@ const defaultSongsRef = useRef(null);
   const [isLinkedToDJ, setIsLinkedToDJ] = useState(() => !!localStorage.getItem('swipedj_client_id'));
   // Supabase consumer account unlock
   const [consumerUnlocked, setConsumerUnlocked] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
 
   useEffect(() => {
-    // Check if the current Supabase session has a consumer_profiles row with spotify_unlocked
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) return;
+    async function applySession(session) {
+      if (!session?.user) {
+        setUserEmail(null);
+        setConsumerUnlocked(false);
+        return;
+      }
+      setUserEmail(session.user.email || null);
       const { data } = await supabase
         .from('consumer_profiles')
         .select('spotify_unlocked')
         .eq('user_id', session.user.id)
         .single();
       if (data?.spotify_unlocked) setConsumerUnlocked(true);
-    });
-    // Also listen for sign-in events (e.g. user clicks password-setup link)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!session?.user) return;
-      const { data } = await supabase
-        .from('consumer_profiles')
-        .select('spotify_unlocked')
-        .eq('user_id', session.user.id)
-        .single();
-      if (data?.spotify_unlocked) setConsumerUnlocked(true);
-    });
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => applySession(session));
     return () => subscription.unsubscribe();
   }, []);
   const [payOpen, setPayOpen] = useState(false);
@@ -1141,6 +1139,29 @@ useEffect(() => {
 
               {proUnlocked && (
                 <p className="px-3 text-xs text-[#D4A017] font-semibold">★ Pro unlocked</p>
+              )}
+
+              {/* Account */}
+              <div className="my-2 h-px bg-[#2A2A2A]" />
+              {userEmail ? (
+                <div className="px-3 py-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-400 truncate">{userEmail}</span>
+                  <button
+                    type="button"
+                    onClick={async () => { await supabase.auth.signOut(); setDrawerOpen(false); }}
+                    className="text-xs font-bold text-[#E8502A] hover:underline flex-shrink-0"
+                  >
+                    Log out
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/login"
+                  className="block px-3 py-2 text-sm text-gray-300 hover:text-white"
+                >
+                  Log in
+                  <span className="block text-xs text-gray-500">Restore a purchase on this device</span>
+                </a>
               )}
             </div>
           </div>
