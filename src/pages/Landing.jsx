@@ -104,12 +104,16 @@ export default function Landing() {
               <a href="#pricing">Pricing</a>
               <Link to="/for-djs">For DJs</Link>
               <a href="#faq">FAQ</a>
-              <Link to="/login">Log in</Link>
             </div>
-            {isIOS
-              ? <a href={APP_STORE_URL} className="nav-cta">Get the app</a>
-              : <Link to="/app" className="nav-cta">Get the app</Link>
-            }
+            {/* Sits outside .nav-links, which is hidden below 720px — account
+                access has to survive on mobile. */}
+            <div className="nav-actions">
+              <Link to="/login" className="nav-login">Log in</Link>
+              {isIOS
+                ? <a href={APP_STORE_URL} className="nav-cta">Get the app</a>
+                : <Link to="/app" className="nav-cta">Get the app</Link>
+              }
+            </div>
           </div>
         </nav>
 

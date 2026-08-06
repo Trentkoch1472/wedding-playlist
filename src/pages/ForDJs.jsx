@@ -23,7 +23,10 @@ export default function ForDJs() {
               <Link to="/for-djs" style={{ color: 'var(--coral)', fontWeight: 600 }}>For DJs</Link>
               <a href="/#faq">FAQ</a>
             </div>
-            <Link to="/dj?role=dj" className="nav-cta">Create DJ account</Link>
+            <div className="nav-actions">
+              <Link to="/login" className="nav-login">Log in</Link>
+              <Link to="/dj?role=dj" className="nav-cta">Create DJ account</Link>
+            </div>
           </div>
         </nav>
 

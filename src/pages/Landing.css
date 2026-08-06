@@ -91,8 +91,25 @@
 }
 .lp .nav-cta:hover { transform: translateY(-1px); background: var(--coral-deep); }
 .lp .nav-cta:active { background: var(--coral-deep); transform: translateY(0); }
+.lp .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.lp .nav-login {
+  color: var(--ink-dim);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color .2s ease;
+}
+.lp .nav-login:hover { color: var(--ink); }
+
 @media (max-width: 720px) {
   .lp .nav-links { display: none; }
+  .lp .nav-actions { gap: 14px; }
+  .lp .nav-login { font-size: 13px; }
 }
 
 /* ——— HERO ——— */
