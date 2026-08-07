@@ -286,7 +286,7 @@ export default function ForDJs() {
             </p>
             <div className="hero-ctas">
               <Link className="btn-primary" to="/dj?role=dj">
-                Create your free DJ account
+                Start your DJ license
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 8h10M9 4l4 4-4 4" />
                 </svg>
@@ -403,7 +403,7 @@ export default function ForDJs() {
                 </ul>
 
                 <Link to="/dj?role=dj" className="plan-cta">
-                  Create your free DJ account
+                  Start your DJ license
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 8h10M9 4l4 4-4 4" />
                   </svg>
