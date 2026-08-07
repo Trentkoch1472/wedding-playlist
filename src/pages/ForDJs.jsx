@@ -75,14 +75,15 @@ const MUST_HAVES = [
   { title: 'September', artist: 'Earth, Wind & Fire' },
 ];
 
-// NOTE: the source brief truncated before listing these five. Placeholder
-// reception tracks — swap for the intended list.
+// The genre and language spread here is deliberate — disco, pop, rock, salsa,
+// country. It signals to DJs working multicultural weddings that the catalogue
+// reaches past English-language pop. Keep the range if these are ever changed.
 const PLAYLIST = [
-  { title: 'Uptown Funk',                  artist: 'Mark Ronson ft. Bruno Mars' },
-  { title: 'I Wanna Dance with Somebody',  artist: 'Whitney Houston' },
-  { title: 'Dancing Queen',                artist: 'ABBA' },
-  { title: 'Signed, Sealed, Delivered',    artist: 'Stevie Wonder' },
-  { title: 'Shut Up and Dance',            artist: 'WALK THE MOON' },
+  { title: 'Uptown Funk',                    artist: 'Mark Ronson ft. Bruno Mars' },
+  { title: 'I Wanna Dance with Somebody',    artist: 'Whitney Houston' },
+  { title: "Don't Stop Believin'",           artist: 'Journey' },
+  { title: 'Periódico de Ayer',              artist: 'Willie Colón & Héctor Lavoe' },
+  { title: 'Country Girl (Shake It for Me)', artist: 'Luke Bryan' },
 ];
 
 function SongRow({ title, artist, star, last }) {
@@ -217,18 +218,26 @@ function DashboardMocks() {
         .dj-mocks {
           position: relative;
           margin-top: 48px;
-          padding-bottom: 64px;
+          /* Mock B is absolute and runs past Mock A's bottom edge; this reserves
+             the room it needs so the pricing section can't collide with it. */
+          padding-bottom: 148px;
         }
-        .dj-mocks .mock-a { width: 74%; }
+        .dj-mocks .mock-a { width: 68%; }
         .dj-mocks .mock-b {
           position: absolute;
           right: 0;
-          bottom: 0;
-          width: 46%;
+          /* Starts below Mock A's stat-card row instead of clipping it. */
+          top: 104px;
+          /* 68% + 32% + 16px resolves to a fixed 16px overlap at any container
+             width. 16px is exactly Mock A's row padding, so the overlap covers
+             the card edge and stops precisely where the chevron column ends —
+             every status pill stays readable, which is the point of showing six
+             rows. A wider overlap would bury the workflow it exists to show. */
+          width: calc(32% + 16px);
         }
         /* Overlapping needs horizontal room. Below this the two stack, which
            also keeps the 11px row text from collapsing on phones. */
-        @media (max-width: 860px) {
+        @media (max-width: 1024px) {
           .dj-mocks { padding-bottom: 0; }
           .dj-mocks .mock-a { width: 100%; }
           .dj-mocks .mock-b {
