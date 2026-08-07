@@ -26,7 +26,8 @@
       "Bash(npx --yes serve -s build -l 4173)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4173/app)",
       "Bash(pkill -f \"serve -s build\")",
-      "Bash(npx --yes serve -s build -l 4173 > /tmp/serve.log 2>&1 & *)"
+      "Bash(npx --yes serve -s build -l 4173 > /tmp/serve.log 2>&1 & *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4173/for-djs)"
     ]
   }
 }
