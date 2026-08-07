@@ -6,6 +6,16 @@ import Papa from "papaparse";
 import useSpotify from "./useSpotify";
 import { supabase } from "./lib/supabase";
 import {
+  pullPlaylist,
+  pushPlaylist,
+  schedulePush,
+  cancelPush,
+  readLocalState,
+  isEmptyState,
+  isDJLinked,
+  PLAYLIST_STATE_VERSION,
+} from "./lib/playlistSync";
+import {
   X,
   Check,
   Star,
@@ -236,26 +246,118 @@ const defaultSongsRef = useRef(null);
   const [consumerUnlocked, setConsumerUnlocked] = useState(false);
   const [userEmail, setUserEmail] = useState(null);
 
-  useEffect(() => {
-    async function applySession(session) {
-      if (!session?.user) {
-        setUserEmail(null);
-        setConsumerUnlocked(false);
-        return;
-      }
-      setUserEmail(session.user.email || null);
-      const { data } = await supabase
+  // Callable on demand: the session arrives after mount, so a one-shot lookup
+  // would resolve against no user and latch the paywall on for a paid account.
+  const refreshConsumerUnlock = useCallback(async (session) => {
+    if (!session?.user) {
+      setUserEmail(null);
+      setConsumerUnlocked(false);
+      return;
+    }
+    setUserEmail(session.user.email || null);
+    try {
+      const { data, error } = await supabase
         .from('consumer_profiles')
         .select('spotify_unlocked')
         .eq('user_id', session.user.id)
-        .single();
-      if (data?.spotify_unlocked) setConsumerUnlocked(true);
+        .maybeSingle();
+      if (error) throw error;
+      // Assign the actual value — latching only on true would leave a revoked
+      // unlock stuck open for the rest of the session.
+      setConsumerUnlocked(!!data?.spotify_unlocked);
+    } catch (e) {
+      console.error('[App] consumer unlock lookup failed:', e);
+      setConsumerUnlocked(false);
+    }
+  }, []);
+
+  /* ---- Cross-device playlist sync ---- */
+  // Which user (if any) we're currently syncing for. A ref because the push
+  // effect below reads it without needing to re-run when it changes.
+  const syncUserIdRef = useRef(null);
+  // Serialized snapshot of what remote is known to hold, so hydration doesn't
+  // immediately echo back the state it just pulled down.
+  const lastSyncedRef = useRef(null);
+
+  const serializeState = useCallback(
+    (s, c, i) => JSON.stringify({ songs: s, choices: c, index: i, version: PLAYLIST_STATE_VERSION }),
+    []
+  );
+
+  const bootstrapSync = useCallback(async (session) => {
+    // DJ-linked couples persist via client_songs on client_id; two writers for
+    // one deck would fight, so consumer sync stays out of that path entirely.
+    if (!session?.user || isDJLinked()) {
+      syncUserIdRef.current = null;
+      lastSyncedRef.current = null;
+      cancelPush();
+      return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => applySession(session));
+    const userId = session.user.id;
+    try {
+      const remote = await pullPlaylist(userId);
+
+      if (!isEmptyState(remote)) {
+        // Remote wins: hydrate React state (useLocalState mirrors to localStorage).
+        const songs_ = remote.songs ?? [];
+        const choices_ = remote.choices ?? {};
+        const index_ = remote.index ?? 0;
+        lastSyncedRef.current = serializeState(songs_, choices_, index_);
+        setSongs(songs_);
+        setChoices(choices_);
+        setIndex(index_);
+        if (songs_.length) setOnboarded(true);
+      } else {
+        // Backfill: swiped anonymously, then bought, then set a password.
+        const local = readLocalState();
+        if (local && !isEmptyState(local)) {
+          lastSyncedRef.current = serializeState(local.songs, local.choices, local.index);
+          await pushPlaylist(userId, local);
+        }
+      }
+    } catch (e) {
+      console.error('[App] playlist sync bootstrap failed:', e);
+    } finally {
+      // Set last so the push effect stays inert until hydration has settled.
+      syncUserIdRef.current = userId;
+    }
+  }, [serializeState, setSongs, setChoices, setIndex, setOnboarded]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      refreshConsumerUnlock(session);
+      bootstrapSync(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        refreshConsumerUnlock(session);
+        if (event !== 'TOKEN_REFRESHED') bootstrapSync(session);
+      } else if (event === 'SIGNED_OUT') {
+        refreshConsumerUnlock(null);
+        // Leave localStorage intact so an anonymous session can carry on.
+        syncUserIdRef.current = null;
+        lastSyncedRef.current = null;
+        cancelPush();
+      }
+    });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refreshConsumerUnlock, bootstrapSync]);
+
+  // Single push hook for every mutation path — swipe, undo, upload, reshuffle,
+  // reset. Watching the state rather than editing ~12 call sites means new
+  // mutations sync automatically instead of being silently missed.
+  useEffect(() => {
+    const userId = syncUserIdRef.current;
+    if (!userId) return; // anonymous or DJ-linked: localStorage only
+
+    const serialized = serializeState(songs, choices, index);
+    if (serialized === lastSyncedRef.current) return; // nothing actually changed
+    lastSyncedRef.current = serialized;
+
+    schedulePush(userId, { songs, choices, index, version: PLAYLIST_STATE_VERSION });
+  }, [songs, choices, index, serializeState]);
   const [payOpen, setPayOpen] = useState(false);
   const pendingActionRef = useRef(null);
 
@@ -370,7 +472,7 @@ const startCheckout = useCallback(async () => {
         .from('clients')
         .select('id')
         .eq('invite_token', token)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         console.warn('Invite token lookup failed:', error?.message);

@@ -13,7 +13,7 @@ export default function InviteHandler() {
         .from('clients')
         .select('id, status')
         .eq('invite_token', token)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         setInvalid(true);

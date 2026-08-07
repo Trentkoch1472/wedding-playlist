@@ -619,7 +619,7 @@ export default function DJDashboard() {
   useEffect(() => {
     if (!session?.user) { setProfile(null); return; }
     const { id, email } = session.user;
-    supabase.from('dj_profiles').select('*').eq('id', id).single()
+    supabase.from('dj_profiles').select('*').eq('id', id).maybeSingle()
       .then(async ({ data }) => {
         if (data) { setProfile(data); return; }
         const { data: created } = await supabase.from('dj_profiles')
@@ -633,7 +633,7 @@ export default function DJDashboard() {
   useEffect(() => {
     if (!checkoutPending || !session?.user) return;
     const interval = setInterval(async () => {
-      const { data } = await supabase.from('dj_profiles').select('*').eq('id', session.user.id).single();
+      const { data } = await supabase.from('dj_profiles').select('*').eq('id', session.user.id).maybeSingle();
       if (data?.stripe_subscription_status === 'active') {
         setProfile(data);
         setCheckoutPending(false);

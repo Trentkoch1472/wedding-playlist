@@ -7,34 +7,60 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState('login'); // 'login' | 'forgot' | 'sent'
+  const [stuck, setStuck] = useState(false); // routing exceeded the timeout guard
 
   // Account type is derived from which profile table holds this user, not from
   // anything they select — one auth pool, so asking would be redundant and
   // a wrong pick would strand them on the other side of the app.
+  //
+  // maybeSingle() so a consumer (no dj_profiles row) gets null rather than an
+  // error, and any failure at all falls through to /app: being sent to the
+  // consumer app is recoverable, being stuck on this screen is not.
   async function routeForUser(userId) {
-    const { data: dj } = await supabase
-      .from('dj_profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
+    let destination = '/app';
+    try {
+      const { data: dj, error: lookupError } = await supabase
+        .from('dj_profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
 
-    window.location.replace(dj ? '/dj' : '/app');
+      if (lookupError) console.error('[Login] dj_profiles lookup failed:', lookupError);
+      else if (dj) destination = '/dj';
+    } catch (e) {
+      console.error('[Login] dj_profiles lookup threw:', e);
+    }
+    window.location.replace(destination);
   }
 
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
+    setStuck(false);
     setLoading(true);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (signInError) {
+    // Nothing below is allowed to leave the user watching a spinner forever.
+    const timeout = setTimeout(() => {
       setLoading(false);
-      setError(signInError.message || 'Could not sign in.');
-      return;
-    }
+      setStuck(true);
+    }, 10000);
 
-    await routeForUser(data.user.id);
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (signInError) {
+        setError(signInError.message || 'Could not sign in.');
+        return;
+      }
+
+      await routeForUser(data.user.id);
+    } catch (e) {
+      console.error('[Login] sign-in failed:', e);
+      setError(e?.message || 'Something went wrong signing in.');
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+    }
   }
 
   async function handleForgot(e) {
@@ -150,6 +176,12 @@ export default function Login() {
                   required
                 />
                 {error && <p style={{ fontSize: '13px', color: '#f87171', margin: 0 }}>{error}</p>}
+                {stuck && (
+                  <p style={{ fontSize: '13px', color: '#f87171', margin: 0 }}>
+                    This is taking longer than expected. You may already be signed in —{' '}
+                    <a href="/app" style={{ color: '#E8502A', fontWeight: 600 }}>continue to the app</a>.
+                  </p>
+                )}
                 <button type="submit" disabled={loading} style={btn}>
                   {loading
                     ? <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Logging in…</>
