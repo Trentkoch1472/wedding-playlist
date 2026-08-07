@@ -65,46 +65,53 @@ export function isEmptyState(state) {
 }
 
 /**
- * Fetch the stored deck for a user.
- * @returns {Promise<object|null>} the playlist_state, or null if absent/failed.
+ * Fetch the stored deck for a user, with the timestamp it was written at so
+ * callers can tell a fresher remote from one they already have.
+ * @returns {Promise<{state: object|null, updatedAt: string|null}>}
  */
 export async function pullPlaylist(userId) {
-  if (!userId) return null;
+  if (!userId) return { state: null, updatedAt: null };
   try {
     const { data, error } = await supabase
       .from('consumer_profiles')
-      .select('playlist_state')
+      .select('playlist_state, playlist_updated_at')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (error) throw error;
-    return data?.playlist_state ?? null;
+    return {
+      state: data?.playlist_state ?? null,
+      updatedAt: data?.playlist_updated_at ?? null,
+    };
   } catch (e) {
     console.error('[playlistSync] pull failed:', e);
-    return null;
+    return { state: null, updatedAt: null };
   }
 }
 
 /**
- * Persist a deck for a user. Resolves false on any failure rather than throwing —
- * callers are in swipe handlers and must not be interrupted.
+ * Persist a deck for a user.
+ * @returns {Promise<string|null>} the timestamp written, or null on failure.
+ * Returning it lets the caller advance its watermark without a re-read.
+ * Never throws — callers sit in swipe handlers and must not be interrupted.
  */
 export async function pushPlaylist(userId, state) {
-  if (!userId || !state) return false;
+  if (!userId || !state) return null;
+  const updatedAt = new Date().toISOString();
   try {
     const { error } = await supabase
       .from('consumer_profiles')
       .update({
         playlist_state: { ...state, version: PLAYLIST_STATE_VERSION },
-        playlist_updated_at: new Date().toISOString(),
+        playlist_updated_at: updatedAt,
       })
       .eq('user_id', userId);
 
     if (error) throw error;
-    return true;
+    return updatedAt;
   } catch (e) {
     console.error('[playlistSync] push failed:', e);
-    return false;
+    return null;
   }
 }
 
@@ -113,24 +120,33 @@ export async function pushPlaylist(userId, state) {
 let pushTimer = null;
 let pendingUserId = null;
 let pendingState = null;
+let pendingOnPushed = null;
 
 /**
  * Coalesce rapid swipes into one write. Each call replaces the pending payload
  * and restarts the timer, so a burst of swipes costs a single request.
+ *
+ * @param onPushed optional callback receiving the written timestamp. The write
+ * lands after this function returns, so this is how a caller keeps its
+ * freshness watermark in step with its own writes.
  */
-export function schedulePush(userId, state) {
+export function schedulePush(userId, state, onPushed) {
   if (!userId || !state) return;
   pendingUserId = userId;
   pendingState = state;
+  pendingOnPushed = onPushed || null;
 
   if (pushTimer) clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => {
+  pushTimer = setTimeout(async () => {
     pushTimer = null;
     const uid = pendingUserId;
     const s = pendingState;
+    const cb = pendingOnPushed;
     pendingUserId = null;
     pendingState = null;
-    pushPlaylist(uid, s);
+    pendingOnPushed = null;
+    const ts = await pushPlaylist(uid, s);
+    if (ts && cb) cb(ts);
   }, PUSH_DEBOUNCE_MS);
 }
 
@@ -141,9 +157,14 @@ export async function flushPush() {
   pushTimer = null;
   const uid = pendingUserId;
   const s = pendingState;
+  const cb = pendingOnPushed;
   pendingUserId = null;
   pendingState = null;
-  if (uid && s) await pushPlaylist(uid, s);
+  pendingOnPushed = null;
+  if (uid && s) {
+    const ts = await pushPlaylist(uid, s);
+    if (ts && cb) cb(ts);
+  }
 }
 
 /** Drop any queued write without sending it. */
@@ -152,4 +173,5 @@ export function cancelPush() {
   pushTimer = null;
   pendingUserId = null;
   pendingState = null;
+  pendingOnPushed = null;
 }

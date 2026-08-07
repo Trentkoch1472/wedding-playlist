@@ -49,6 +49,9 @@ function toHttps(u) {
 }
 
 
+// Focus fires on every tab switch; without a floor that would hammer the API.
+const FOCUS_PULL_THROTTLE_MS = 10000;
+
 // iOS check in module scope to avoid hook dependency warnings
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -279,10 +282,33 @@ const defaultSongsRef = useRef(null);
   // immediately echo back the state it just pulled down.
   const lastSyncedRef = useRef(null);
 
+  // Timestamp of the newest remote write this tab knows about. Anything not
+  // strictly newer than this is either our own write echoing back or stale.
+  const lastUpdatedAtRef = useRef(null);
+  // Wall-clock of the last focus-triggered pull, for throttling.
+  const lastFocusPullRef = useRef(0);
+
   const serializeState = useCallback(
     (s, c, i) => JSON.stringify({ songs: s, choices: c, index: i, version: PLAYLIST_STATE_VERSION }),
     []
   );
+
+  // Shared by bootstrap and the focus pull so the two can't drift apart.
+  // Seeds lastSyncedRef *before* the setters so the push effect sees the
+  // incoming state as already-synced and stays quiet.
+  const applyRemoteState = useCallback((state, updatedAt) => {
+    const songs_ = state.songs ?? [];
+    const choices_ = state.choices ?? {};
+    const index_ = state.index ?? 0;
+
+    lastSyncedRef.current = serializeState(songs_, choices_, index_);
+    lastUpdatedAtRef.current = updatedAt ?? lastUpdatedAtRef.current;
+
+    setSongs(songs_);
+    setChoices(choices_);
+    setIndex(index_);
+    if (songs_.length) setOnboarded(true);
+  }, [serializeState, setSongs, setChoices, setIndex, setOnboarded]);
 
   const bootstrapSync = useCallback(async (session) => {
     // DJ-linked couples persist via client_songs on client_id; two writers for
@@ -290,30 +316,25 @@ const defaultSongsRef = useRef(null);
     if (!session?.user || isDJLinked()) {
       syncUserIdRef.current = null;
       lastSyncedRef.current = null;
+      lastUpdatedAtRef.current = null;
       cancelPush();
       return;
     }
 
     const userId = session.user.id;
     try {
-      const remote = await pullPlaylist(userId);
+      const { state: remote, updatedAt } = await pullPlaylist(userId);
 
       if (!isEmptyState(remote)) {
         // Remote wins: hydrate React state (useLocalState mirrors to localStorage).
-        const songs_ = remote.songs ?? [];
-        const choices_ = remote.choices ?? {};
-        const index_ = remote.index ?? 0;
-        lastSyncedRef.current = serializeState(songs_, choices_, index_);
-        setSongs(songs_);
-        setChoices(choices_);
-        setIndex(index_);
-        if (songs_.length) setOnboarded(true);
+        applyRemoteState(remote, updatedAt);
       } else {
         // Backfill: swiped anonymously, then bought, then set a password.
         const local = readLocalState();
         if (local && !isEmptyState(local)) {
           lastSyncedRef.current = serializeState(local.songs, local.choices, local.index);
-          await pushPlaylist(userId, local);
+          const ts = await pushPlaylist(userId, local);
+          if (ts) lastUpdatedAtRef.current = ts;
         }
       }
     } catch (e) {
@@ -322,7 +343,48 @@ const defaultSongsRef = useRef(null);
       // Set last so the push effect stays inert until hydration has settled.
       syncUserIdRef.current = userId;
     }
-  }, [serializeState, setSongs, setChoices, setIndex, setOnboarded]);
+  }, [serializeState, applyRemoteState]);
+
+  // Re-pull when the tab regains focus, so a deck edited on another device
+  // shows up here without a sign-out/in cycle.
+  const pullOnFocus = useCallback(async () => {
+    const userId = syncUserIdRef.current;
+    if (!userId || isDJLinked()) return;
+
+    const now = Date.now();
+    if (now - lastFocusPullRef.current < FOCUS_PULL_THROTTLE_MS) return;
+    lastFocusPullRef.current = now;
+
+    try {
+      const { state: remote, updatedAt } = await pullPlaylist(userId);
+      if (isEmptyState(remote) || !updatedAt) return;
+
+      // Strictly newer only. Equal means it's our own write coming back;
+      // older means this tab is ahead and hydrating would lose work.
+      const known = lastUpdatedAtRef.current;
+      if (known && new Date(updatedAt) <= new Date(known)) return;
+
+      applyRemoteState(remote, updatedAt);
+    } catch (e) {
+      console.error('[App] focus pull failed:', e);
+    }
+  }, [applyRemoteState]);
+
+  useEffect(() => {
+    const onFocus = () => pullOnFocus();
+    // Mobile Safari frequently skips `focus` on tab/app switch, so
+    // visibilitychange is the one that actually fires there.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') pullOnFocus();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [pullOnFocus]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -339,6 +401,8 @@ const defaultSongsRef = useRef(null);
         // Leave localStorage intact so an anonymous session can carry on.
         syncUserIdRef.current = null;
         lastSyncedRef.current = null;
+        lastUpdatedAtRef.current = null;
+        lastFocusPullRef.current = 0;
         cancelPush();
       }
     });
@@ -356,7 +420,13 @@ const defaultSongsRef = useRef(null);
     if (serialized === lastSyncedRef.current) return; // nothing actually changed
     lastSyncedRef.current = serialized;
 
-    schedulePush(userId, { songs, choices, index, version: PLAYLIST_STATE_VERSION });
+    // Advance the watermark on our own writes too, so the next focus pull
+    // recognises them as already-seen instead of re-hydrating from them.
+    schedulePush(
+      userId,
+      { songs, choices, index, version: PLAYLIST_STATE_VERSION },
+      (ts) => { lastUpdatedAtRef.current = ts; }
+    );
   }, [songs, choices, index, serializeState]);
   const [payOpen, setPayOpen] = useState(false);
   const pendingActionRef = useRef(null);
