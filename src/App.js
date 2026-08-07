@@ -59,7 +59,24 @@ const BOTTOM_NAV_HEIGHT = 50;
 // Album art is the single largest fixed block in the card. Capping it against
 // viewport height lets the card compress on short screens rather than
 // overflowing — below roughly 765px tall this starts shrinking.
-const ALBUM_ART_HEIGHT = 'min(260px, 34dvh)';
+const ALBUM_ART_MAX = 'min(260px, 34dvh)';
+
+// Covers are square. Constraining height alone and letting width fill the card
+// made object-fit:cover slice the top and bottom off every one, so the box is
+// held square and the whole cover scales down inside it instead. Shared between
+// the front and back card so the flip can't jump between two art sizes.
+const ALBUM_ART_STYLE = {
+  aspectRatio: '1 / 1',
+  maxHeight: ALBUM_ART_MAX,
+  width: 'auto',
+  maxWidth: '100%',
+  // Auto side margins keep it centred as it shrinks below the card width.
+  display: 'block',
+  marginLeft: 'auto',
+  marginRight: 'auto',
+  imageRendering: 'high-quality',
+  pointerEvents: 'none',
+};
 
 // iOS check in module scope to avoid hook dependency warnings
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -1435,8 +1452,8 @@ useEffect(() => {
                             referrerPolicy="no-referrer"
                             alt={`${nextSong.title} cover`}
                             draggable="false"
-                            className="relative z-10 w-full rounded-[16px] object-cover mt-4"
-                            style={{ height: ALBUM_ART_HEIGHT, imageRendering: 'high-quality', pointerEvents: 'none' }}
+                            className="relative z-10 rounded-[16px] object-cover mt-4"
+                            style={ALBUM_ART_STYLE}
                           />
                         ) : null}
 
@@ -1501,7 +1518,7 @@ useEffect(() => {
 
                   {current ? (
                     <>
-                      {/* Album art — full card width, 260px tall */}
+                      {/* Album art — square, scaled to fit the vertical budget */}
                       {current.__art ? (
                         <img
                           src={toHttps(current.__art)}
@@ -1509,8 +1526,8 @@ useEffect(() => {
                           referrerPolicy="no-referrer"
                           alt={`${current.title} cover`}
                           draggable="false"
-                          className="relative z-10 w-full rounded-[16px] object-cover"
-                          style={{ height: ALBUM_ART_HEIGHT, imageRendering: 'high-quality', WebkitUserDrag: 'none', userSelect: 'none', pointerEvents: 'none' }}
+                          className="relative z-10 rounded-[16px] object-cover"
+                          style={{ ...ALBUM_ART_STYLE, WebkitUserDrag: 'none', userSelect: 'none' }}
                         />
                       ) : null}
 
