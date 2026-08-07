@@ -22,7 +22,10 @@
       "Bash(grep -rn '\\\\$5\\\\|\\\\$ 5\\\\|five dollar\\\\|price\\\\|Unlock\\\\|unlock' /Users/trentkoch/Desktop/wedding-playlist/src/App.js)",
       "Bash(grep -i \"\\\\$\\\\|price\")",
       "Bash(grep -rn '\\\\$' /Users/trentkoch/Desktop/wedding-playlist/src/App.js)",
-      "Bash(grep -v '\\\\${')"
+      "Bash(grep -v '\\\\${')",
+      "Bash(npx --yes serve -s build -l 4173)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4173/app)",
+      "Bash(pkill -f \"serve -s build\")"
     ]
   }
 }

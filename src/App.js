@@ -52,6 +52,15 @@ function toHttps(u) {
 // Focus fires on every tab switch; without a floor that would hammer the API.
 const FOCUS_PULL_THROTTLE_MS = 10000;
 
+// Height of the fixed bottom nav, shared so the swipe stage can reserve exactly
+// as much room as the nav actually occupies.
+const BOTTOM_NAV_HEIGHT = 50;
+
+// Album art is the single largest fixed block in the card. Capping it against
+// viewport height lets the card compress on short screens rather than
+// overflowing — below roughly 765px tall this starts shrinking.
+const ALBUM_ART_HEIGHT = 'min(260px, 34dvh)';
+
 // iOS check in module scope to avoid hook dependency warnings
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -1350,12 +1359,22 @@ useEffect(() => {
             display: activeTab === 'swipe' ? 'flex' : 'none',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
+            // `margin: auto` on the child instead of `justify-content: center`:
+            // centred content that overflows gets clipped at BOTH ends and the
+            // top becomes unreachable, because scrolling can't reach above the
+            // scroll origin. Auto margins collapse when space runs out, so the
+            // card centres when it fits and scrolls normally when it doesn't.
+            overflowY: 'auto',
+            // Must be explicit: with overflow-y auto and overflow-x visible the
+            // browser promotes overflow-x to auto, which would show a horizontal
+            // scrollbar every time a card flings off-screen.
+            overflowX: 'hidden',
+            // The nav is position:fixed and this stage's inset:0 runs underneath it.
+            paddingBottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
           }}
         >
           {!songs.length ? (
-            <div className="text-center px-8">
+            <div className="text-center px-8" style={{ margin: 'auto' }}>
               <h2 className="text-2xl font-semibold mb-2">Import your song list</h2>
               <p className="text-gray-400 mb-6">
                 Accepted formats: CSV or JSONL. Include at least a title field, artist is optional.
@@ -1368,7 +1387,7 @@ useEffect(() => {
               </button>
             </div>
           ) : (
-            <div style={{ width: '100%', maxWidth: '448px' }}>
+            <div style={{ width: '100%', maxWidth: '448px', margin: 'auto' }}>
             {/* swipe card */}
             <section {...swipeHandlers} className="select-none touch-none overscroll-contain">
               <div className="relative mx-auto w-full">
@@ -1417,7 +1436,7 @@ useEffect(() => {
                             alt={`${nextSong.title} cover`}
                             draggable="false"
                             className="relative z-10 w-full rounded-[16px] object-cover mt-4"
-                            style={{ height: '260px', imageRendering: 'high-quality', pointerEvents: 'none' }}
+                            style={{ height: ALBUM_ART_HEIGHT, imageRendering: 'high-quality', pointerEvents: 'none' }}
                           />
                         ) : null}
 
@@ -1491,7 +1510,7 @@ useEffect(() => {
                           alt={`${current.title} cover`}
                           draggable="false"
                           className="relative z-10 w-full rounded-[16px] object-cover"
-                          style={{ height: '260px', imageRendering: 'high-quality', WebkitUserDrag: 'none', userSelect: 'none', pointerEvents: 'none' }}
+                          style={{ height: ALBUM_ART_HEIGHT, imageRendering: 'high-quality', WebkitUserDrag: 'none', userSelect: 'none', pointerEvents: 'none' }}
                         />
                       ) : null}
 
@@ -1685,7 +1704,7 @@ useEffect(() => {
 
       {/* ── Bottom tab bar ─────────────────────────────── */}
       <div style={{display:'flex', flexDirection:'row', width:'100%',
-        height:'50px', paddingBottom:'env(safe-area-inset-bottom)',
+        height:`${BOTTOM_NAV_HEIGHT}px`, paddingBottom:'env(safe-area-inset-bottom)',
         background:'#111111', borderTop:'1px solid #2A2A2A',
         position:'fixed', bottom:0, left:0, right:0, zIndex:30}}>
 
