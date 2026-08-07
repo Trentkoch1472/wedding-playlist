@@ -269,8 +269,12 @@ export default function ForDJs() {
               <img src="/swipeDJ logo.svg" alt="SwipeDJ" style={{ height: '28px' }} />
             </a>
             <div className="nav-links">
-              <a href="/#how">How it works</a>
-              <a href="/#pricing">Pricing</a>
+              {/* Same-page fragments: this page has its own #how and #pricing.
+                  Pointing at /#how sent a DJ mid-pitch to the consumer landing
+                  page. FAQ stays cross-page — /for-djs has no FAQ section.
+                  The footer links below are deliberately left cross-page. */}
+              <a href="#how">How it works</a>
+              <a href="#pricing">Pricing</a>
               <Link to="/for-djs" style={{ color: 'var(--coral)', fontWeight: 600 }}>For DJs</Link>
               <a href="/#faq">FAQ</a>
             </div>
