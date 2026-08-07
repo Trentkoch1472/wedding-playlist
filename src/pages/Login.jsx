@@ -79,7 +79,7 @@ export default function Login() {
 
   const inp = {
     width: '100%', padding: '12px 14px', borderRadius: '10px',
-    background: '#1C1C1E', border: '1px solid #2A2A2A', color: '#ffffff',
+    background: '#1C1C1E', '--input-bg': '#1C1C1E', border: '1px solid #2A2A2A', color: '#ffffff',
     fontSize: '15px', outline: 'none', boxSizing: 'border-box',
   };
 

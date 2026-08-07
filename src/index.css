@@ -4,6 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The app is dark-only. Declaring it makes the browser render native UI —
+   scrollbars, select dropdowns, date pickers, Edge's password-reveal icon —
+   in their dark variants instead of defaulting to light against a near-black UI. */
+:root {
+  color-scheme: dark;
+}
+
 body, #root {
   background-color: #0D0D0D;
+}
+
+/* Autofill overrides.
+   Chrome and Safari ignore background-color on autofilled fields, so the only
+   reliable repaint is a large inset box-shadow. Without this, autofilling any
+   login form paints pale yellow with dark text on a near-black card.
+
+   Input backgrounds aren't uniform across the app (#1C1C1E on most forms,
+   #0D0D0D on DJLogin and the Add Couple modal), so each input publishes its own
+   value via --input-bg and this rule follows it. The fallback matches the
+   majority case for any input that hasn't set it. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg, #1C1C1E) inset;
+          box-shadow: 0 0 0 1000px var(--input-bg, #1C1C1E) inset;
+  -webkit-text-fill-color: #FFFFFF;
+  caret-color: #FFFFFF;
+  /* The shadow is repainted on an animation frame after autofill; an absurd
+     transition delay stops the browser's own yellow from flashing through. */
+  transition: background-color 9999s ease-in-out 0s;
 }

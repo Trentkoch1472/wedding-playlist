@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 const inp = {
   width: '100%', padding: '12px', borderRadius: '8px',
-  background: '#0D0D0D', border: '1px solid #2C2C2E',
+  background: '#0D0D0D', '--input-bg': '#0D0D0D', border: '1px solid #2C2C2E',
   color: '#ffffff', fontSize: '15px', outline: 'none',
   boxSizing: 'border-box',
 };

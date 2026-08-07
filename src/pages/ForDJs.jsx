@@ -424,6 +424,7 @@ export default function ForDJs() {
               <a href="/#pricing">Pricing</a>
               <Link to="/for-djs">For DJs</Link>
               <a href="/#faq">FAQ</a>
+              <Link to="/privacy">Privacy</Link>
             </div>
             <div className="footer-meta">© 2026 · Made for the dance floor</div>
           </div>

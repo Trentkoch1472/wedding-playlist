@@ -450,8 +450,7 @@ export default function Landing() {
                 <a href="#how">How it works</a>
                 <a href="#pricing">Pricing</a>
                 <Link to="/for-djs">For DJs</Link>
-                {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-                <a href="#privacy">Privacy</a>
+                <Link to="/privacy">Privacy</Link>
                 {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
                 <a href="#support">Support</a>
               </div>
