@@ -91,24 +91,34 @@ export async function pullPlaylist(userId) {
 
 /**
  * Persist a deck for a user.
- * @returns {Promise<string|null>} the timestamp written, or null on failure.
- * Returning it lets the caller advance its watermark without a re-read.
+ *
+ * playlist_updated_at is stamped by a database trigger, so it is deliberately
+ * absent from the payload — a client timestamp would be discarded by Postgres
+ * and leave the caller tracking a value that was never stored. The row is read
+ * back in the same round trip to get the authoritative server time.
+ *
+ * @returns {Promise<string|null>} the server-stamped timestamp, or null if the
+ * write or read-back failed. Null means "don't move the watermark": a stale
+ * watermark costs one redundant pull, a wrong one silently loses swipes.
+ *
+ * An unchanged timestamp is a normal outcome, not a failure — the trigger only
+ * fires when playlist_state actually differs, so a no-op write returns the
+ * existing value.
+ *
  * Never throws — callers sit in swipe handlers and must not be interrupted.
  */
 export async function pushPlaylist(userId, state) {
   if (!userId || !state) return null;
-  const updatedAt = new Date().toISOString();
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('consumer_profiles')
-      .update({
-        playlist_state: { ...state, version: PLAYLIST_STATE_VERSION },
-        playlist_updated_at: updatedAt,
-      })
-      .eq('user_id', userId);
+      .update({ playlist_state: { ...state, version: PLAYLIST_STATE_VERSION } })
+      .eq('user_id', userId)
+      .select('playlist_updated_at')
+      .maybeSingle();
 
     if (error) throw error;
-    return updatedAt;
+    return data?.playlist_updated_at ?? null;
   } catch (e) {
     console.error('[playlistSync] push failed:', e);
     return null;
