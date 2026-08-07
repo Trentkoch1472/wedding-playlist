@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import SetPassword from './pages/SetPassword';
 import Login from './pages/Login';
 import Privacy from './pages/Privacy';
+import Support from './pages/Support';
 import SpotifyCallback from './pages/SpotifyCallback';
 import reportWebVitals from './reportWebVitals';
 
@@ -30,6 +31,7 @@ root.render(
         <Route path="/set-password" element={<SetPassword />} />
         <Route path="/login" element={<Login />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/callback" element={<SpotifyCallback />} />
       </Routes>
     </BrowserRouter>

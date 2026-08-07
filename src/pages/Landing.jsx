@@ -451,8 +451,7 @@ export default function Landing() {
                 <a href="#pricing">Pricing</a>
                 <Link to="/for-djs">For DJs</Link>
                 <Link to="/privacy">Privacy</Link>
-                {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-                <a href="#support">Support</a>
+                <Link to="/support">Support</Link>
               </div>
               <div className="footer-meta">© 2026 · Made for the dance floor</div>
             </div>
